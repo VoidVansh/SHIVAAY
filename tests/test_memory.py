@@ -59,6 +59,24 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertIn("category=decision", context)
         self.assertIn("importance=5", context)
 
+    def test_delete_conversation_removes_archive_and_summary_but_linked_memories_are_opt_in(self):
+        conversation_id = "conversation-to-delete"
+        self.engine.archive_conversation(conversation_id, [
+            {"role": "user", "content": "A private message"},
+            {"role": "assistant", "content": "A reply"},
+        ], project="SHIVAAY")
+        self.engine.save_summary("conversation", conversation_id, "A continuity summary")
+        linked = self.engine.add_memory("A linked project fact.", project="SHIVAAY",
+                                        source_ref=conversation_id)
+        result = self.engine.delete_conversation(conversation_id)
+        self.assertEqual(result["messages_deleted"], 2)
+        self.assertEqual(result["summaries_deleted"], 1)
+        self.assertEqual(result["linked_memories_deleted"], 0)
+        self.assertEqual(self.engine.get_conversation_messages(conversation_id), [])
+        self.assertIsNotNone(self.engine.get_memory(linked))
+        self.engine.delete_conversation(conversation_id, include_linked_memories=True)
+        self.assertIsNone(self.engine.get_memory(linked))
+
     def test_delete_cleans_references_and_preserves_other_history(self):
         original = self.engine.add_memory("The original fact.", project="SHIVAAY")
         corrected = self.engine.correct_memory(original, "The corrected fact.", reason="test")

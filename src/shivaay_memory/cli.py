@@ -124,6 +124,11 @@ def _parser() -> argparse.ArgumentParser:
     policy.add_argument("--min-score", type=float)
 
     sub.add_parser("stats", help="Show local memory counts")
+    delete_conversation = sub.add_parser("delete-conversation", help="Delete an archived conversation and its summary")
+    delete_conversation.add_argument("--id", required=True, help="Conversation ID")
+    delete_conversation.add_argument("--include-linked-memories", action="store_true",
+                                     help="Also permanently delete memories whose source reference matches this conversation ID")
+
     delete = sub.add_parser("delete", help="Permanently delete a memory (cannot be undone)")
     delete.add_argument("--id", type=int, required=True)
     return parser
@@ -225,6 +230,11 @@ def main() -> None:
             stats = {"database": str(engine.store.db_path), **engine.stats()}
             stats["pending_candidates"] = len(queue.list(status="pending", limit=200))
             print(json.dumps(stats, indent=2))
+        elif args.command == "delete-conversation":
+            result = engine.delete_conversation(
+                args.id, include_linked_memories=args.include_linked_memories
+            )
+            print(json.dumps(result, indent=2))
         elif args.command == "delete":
             print("Deleted." if engine.delete_memory(args.id) else "Memory not found.")
     except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:

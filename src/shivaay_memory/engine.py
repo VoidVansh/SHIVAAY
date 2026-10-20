@@ -363,6 +363,54 @@ class MemoryEngine:
                 changed += cur.rowcount
             return changed
 
+    def delete_conversation(
+        self, conversation_id: str, *, include_linked_memories: bool = False
+    ) -> dict[str, int]:
+        """Delete an archived conversation and its summary; linked memories are opt-in.
+
+        A memory is considered linked only when its source_ref exactly matches
+        the conversation ID. This prevents broad, accidental deletion.
+        """
+        conversation_id = conversation_id.strip()
+        if not conversation_id:
+            raise ValueError("conversation_id cannot be empty.")
+        linked_ids: list[int] = []
+        if include_linked_memories:
+            linked_ids = [row["id"] for row in self.store.execute(
+                "SELECT id FROM memories WHERE source_ref=?", (conversation_id,)
+            )]
+            for memory_id in linked_ids:
+                self.delete_memory(memory_id)
+        with self.store.connect() as conn:
+            message_count = conn.execute(
+                "SELECT COUNT(*) FROM conversations WHERE conversation_id=?",
+                (conversation_id,),
+            ).fetchone()[0]
+            summary_count = conn.execute(
+                "SELECT COUNT(*) FROM summaries WHERE scope='conversation' AND scope_key=?",
+                (conversation_id,),
+            ).fetchone()[0]
+            conn.execute("DELETE FROM conversations WHERE conversation_id=?", (conversation_id,))
+            conn.execute(
+                "DELETE FROM summaries WHERE scope='conversation' AND scope_key=?",
+                (conversation_id,),
+            )
+            tables = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            candidate_count = 0
+            if "memory_candidates" in tables:
+                cur = conn.execute(
+                    "DELETE FROM memory_candidates WHERE source_ref=?", (conversation_id,)
+                )
+                candidate_count = cur.rowcount
+        return {
+            "messages_deleted": int(message_count),
+            "summaries_deleted": int(summary_count),
+            "candidates_deleted": int(candidate_count),
+            "linked_memories_deleted": len(linked_ids),
+        }
+
     def delete_memory(self, memory_id: int) -> bool:
         """Hard-delete a memory and clean derived references, preserving other records.
 

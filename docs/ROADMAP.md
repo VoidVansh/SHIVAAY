@@ -4,7 +4,7 @@
 - [x] SQLite memory store and FTS5 search
 - [x] Conversation archive and summaries
 - [x] Provenance, confidence, importance, project scoping
-- [x] Correction history and basic sensitive-memory gate\n- [x] Hard-delete memory cleanup for derived indexes and dependent suggestions
+- [x] Correction history and basic sensitive-memory gate\n- [x] Hard-delete memory cleanup for derived indexes and dependent suggestions\n- [x] Conversation archive/summary deletion with opt-in linked-memory cleanup
 
 ## Milestone 2 — Candidate extraction and review
 - [x] Conservative rule-based candidate extractor from user messages
