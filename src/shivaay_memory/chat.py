@@ -15,12 +15,12 @@ from typing import Protocol
 
 from .engine import MemoryEngine
 from .extraction import CandidateExtractor
+from .semantic import SemanticMemoryIndex
 from .session import MemorySession, TurnResult
 
 
 class ChatBackend(Protocol):
     """Minimal interface for any chat-completion backend."""
-
     def reply(self, messages: list[dict[str, str]]) -> str:
         """Return the assistant response for a sequence of role/content messages."""
         ...
@@ -28,7 +28,6 @@ class ChatBackend(Protocol):
 
 class OllamaBackend:
     """Call an Ollama server, defaulting to a local-only loopback endpoint."""
-
     def __init__(self, model: str = "qwen2.5:3b", host: str = "http://127.0.0.1:11434", timeout: int = 180):
         self.model = model.strip()
         self.host = host.rstrip("/")
@@ -48,18 +47,13 @@ class OllamaBackend:
 
     def reply(self, messages: list[dict[str, str]]) -> str:
         payload = json.dumps({"model": self.model, "messages": messages, "stream": False}).encode("utf-8")
-        request = urllib.request.Request(
-            f"{self.host}/api/chat", data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
+        request = urllib.request.Request(f"{self.host}/api/chat", data=payload,
+            headers={"Content-Type": "application/json"}, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except urllib.error.URLError as exc:
-            raise RuntimeError(
-                "Could not reach local Ollama. Install/start Ollama and pull the selected model first. "
-                "No remote fallback is attempted."
-            ) from exc
+            raise RuntimeError("Could not reach local Ollama. Install/start Ollama and pull the selected model first. No remote fallback is attempted.") from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise RuntimeError("Local Ollama returned invalid JSON.") from exc
         content = result.get("message", {}).get("content")
@@ -70,23 +64,16 @@ class OllamaBackend:
 
 class MemoryChat:
     """Chat orchestration: retrieve context, generate, archive, queue candidates."""
-
-    def __init__(
-        self,
-        engine: MemoryEngine,
-        backend: ChatBackend,
-        *,
-        project: str = "general",
-        extractor: CandidateExtractor | None = None,
-        conversation_id: str | None = None,
-        history_limit: int = 12,
-    ) -> None:
+    def __init__(self, engine: MemoryEngine, backend: ChatBackend, *, project: str = "general",
+                 extractor: CandidateExtractor | None = None, conversation_id: str | None = None,
+                 history_limit: int = 12, semantic_index: SemanticMemoryIndex | None = None):
         self.engine = engine
         self.backend = backend
         self.project = project
         self.conversation_id = conversation_id or str(uuid.uuid4())
         self.history_limit = max(2, history_limit)
         self.session = MemorySession(engine, extractor=extractor)
+        self.semantic_index = semantic_index
         self.history: list[dict[str, str]] = []
 
     def send(self, user_message: str) -> tuple[str, TurnResult]:
@@ -94,6 +81,13 @@ class MemoryChat:
         if not text:
             raise ValueError("Message cannot be empty.")
         memory_context = self.session.context_for(text, project=self.project, limit=8)
+        if self.semantic_index is not None:
+            semantic_hits = self.semantic_index.search(text, project=self.project, limit=4)
+            if semantic_hits:
+                block = ["[Semantically related saved memories — similarity is a relevance signal, not proof]"]
+                for memory in semantic_hits:
+                    block.append(f"- (memory #{memory['id']}; similarity={memory['semantic_score']:.3f}; source={memory['source_type']}; confidence={memory['confidence']:.2f}) {memory['text']}")
+                memory_context += "\n" + "\n".join(block)
         system = (
             "You are SHIVAAY, an honest, helpful personal AI companion. Use saved context when relevant, "
             "but treat it as fallible evidence: prefer the user's latest explicit correction, do not invent "
@@ -105,9 +99,7 @@ class MemoryChat:
         answer = self.backend.reply(messages).strip()
         if not answer:
             raise RuntimeError("Chat backend returned an empty response.")
-        result = self.session.finish_turn(
-            self.conversation_id, text, answer, project=self.project
-        )
+        result = self.session.finish_turn(self.conversation_id, text, answer, project=self.project)
         self.history.extend([{"role": "user", "content": text}, {"role": "assistant", "content": answer}])
         self.history = self.history[-self.history_limit:]
         return answer, result
