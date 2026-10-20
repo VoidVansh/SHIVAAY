@@ -67,6 +67,8 @@ The initial indexing run embeds each active memory and may take time. Re-index a
 
 ```bash
 shivaay-memory search "database" --project SHIVAAY --limit 10
+shivaay-memory show --id 1
+shivaay-memory doctor
 shivaay-memory context "What database did we choose?" --project SHIVAAY --limit 8
 shivaay-memory list --include-superseded
 shivaay-memory correct --id 1 --text "The corrected fact goes here." --reason "User correction"
