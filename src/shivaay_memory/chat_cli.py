@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from .chat import MemoryChat, OllamaBackend
@@ -29,7 +30,7 @@ def main() -> None:
         parser.error("--capture-mode model requires --capture-candidates")
 
     try:
-        engine = MemoryEngine(args.db)
+        engine = MemoryEngine(args.db or os.environ.get("SHIVAAY_MEMORY_DB"))
         backend = OllamaBackend(model=args.model, host=args.host)
         semantic_index = None
         if args.semantic:
