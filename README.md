@@ -71,3 +71,26 @@ python -m unittest discover -s tests -v
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the initial architecture and roadmap.
+
+
+## Automatic memory candidate review
+
+The second milestone adds a conservative candidate extractor. It scans only user messages from a supplied JSON conversation, proposes potentially durable memories, and queues them for review. It does **not** automatically turn every message into a fact.
+
+Create `conversation.json`:
+```json
+[
+  {"role": "user", "content": "Please remember that I prefer concise answers."},
+  {"role": "assistant", "content": "Got it."}
+]
+```
+
+Then:
+```bash
+shivaay-memory extract --file conversation.json --project SHIVAAY --source-ref chat-001
+shivaay-memory candidates
+shivaay-memory approve-candidate --id 1
+shivaay-memory reject-candidate --id 2
+```
+
+Candidate extraction currently uses conservative rules, not an LLM. It is an intermediate safety-first step before model-backed extraction and live chat integration. See [automatic memory capture](docs/AUTOMATIC_MEMORY.md) and [roadmap](docs/ROADMAP.md).
