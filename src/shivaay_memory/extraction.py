@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .engine import MemoryEngine
-from .maintenance import possible_conflict_text
+from .maintenance import possible_conflict_text, possible_update_text
 from .scoring import score_candidate
 
 
@@ -189,6 +189,7 @@ class CandidateQueue:
                 # The candidate stays pending so the user can decide which claim is current.
                 active_memories = self.engine.list_memories(project=row["project"], limit=500)
                 if any(possible_conflict_text(row["text"], memory["text"])
+                       or possible_update_text(row["text"], memory["text"])
                        for memory in active_memories):
                     continue
                 try:
@@ -250,8 +251,12 @@ class CandidateQueue:
                     active_by_project[project] = self.engine.list_memories(project=project, limit=500)
                 conflict = any(possible_conflict_text(item["text"], memory["text"])
                                for memory in active_by_project[project])
+                update = any(possible_update_text(item["text"], memory["text"])
+                             for memory in active_by_project[project])
                 if conflict:
                     decision, reason = "blocked", "Possible contradiction with an active memory; review manually."
+                elif update:
+                    decision, reason = "blocked", "Explicit update cue may revise an active memory; review and correct history manually."
                 else:
                     decision, reason = "eligible", (
                         "Meets current thresholds; queued items are not auto-approved retroactively."
