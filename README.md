@@ -27,7 +27,9 @@ shivaay-memory search "honest facts" --project SHIVAAY
 shivaay-memory context "What are SHIVAAY's principles?" --project SHIVAAY
 ```
 
-The database defaults to `~/.local/share/shivaay/memory.sqlite3`. Set `SHIVAAY_MEMORY_DB` or pass `--db` to choose another path. Keep the database out of Git; it can contain personal information.\n\nTo delete one archived conversation and its summary, run `shivaay-memory delete-conversation --id CONVERSATION_ID`. This leaves individually saved memories intact unless you explicitly add `--include-linked-memories`; that flag only deletes memories whose `source_ref` exactly matches the conversation ID. Deleting a memory alone does not erase its source conversation archive.
+The database defaults to `~/.local/share/shivaay/memory.sqlite3`. Set `SHIVAAY_MEMORY_DB` or pass `--db` to choose another path. Keep the database out of Git; it can contain personal information.
+
+To delete one archived conversation and its summary, run `shivaay-memory delete-conversation --id CONVERSATION_ID`. This leaves individually saved memories intact unless you explicitly add `--include-linked-memories`; that flag only deletes memories whose `source_ref` exactly matches the conversation ID. Deleting a memory alone does not erase its source conversation archive.
 
 ## Run an actual local chat
 

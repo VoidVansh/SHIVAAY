@@ -23,7 +23,7 @@ shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --semanti
 
 When `--semantic` is enabled, SHIVAAY indexes the project's current active memories at startup. First indexing can take a while. Re-run `shivaay-semantic index --project SHIVAAY` after new memories are approved or existing memories are corrected, so the vector index stays current. When semantic indexing is enabled, chat fuses lexical and semantic rankings and deduplicates memories by ID. The default context budget is 8,000 characters; adjust it with `--context-chars` (500–50,000). This is a character cap rather than an exact model-token count.
 
-Type `/quit` to exit. Each completed turn is archived locally. `--capture-candidates` queues possible memories for later review; it does not approve them automatically. Review them with `shivaay-memory candidates`, then approve/reject by ID. Omit the flag to disable automatic candidate proposals.
+Type `/quit` to exit. Each completed turn is archived locally. `--capture-candidates` queues possible memories for later review; it does not approve them automatically. By default, `--capture-mode rules` uses conservative patterns. `--capture-mode model` uses the configured local Ollama model to extract structured candidate suggestions and adds one extra model call per turn. Both modes only propose candidates; review them with `shivaay-memory candidates`, then approve/reject by ID. Omit `--capture-candidates` to disable automatic candidate proposals.
 
 ## Python API
 

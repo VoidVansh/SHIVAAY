@@ -55,7 +55,7 @@ The database is stored locally by default at `~/.local/share/shivaay/memory.sqli
 shivaay-chat --project SHIVAAY --conversation-id YOUR_CONVERSATION_ID
 ```
 
-Candidate capture queues possible memories for review; it does not automatically save them as durable memories. Review candidates with `shivaay-memory candidates`, then approve or reject them explicitly.
+Candidate capture queues possible memories for review; it does not automatically save them as durable memories. Review candidates with `shivaay-memory candidates`, then approve or reject them explicitly. To use model-backed extraction rather than rules, add `--capture-mode model`; it adds an extra local inference call per turn.
 
 ## 5. Optional semantic retrieval
 
