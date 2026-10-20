@@ -15,6 +15,7 @@ dependencies = []
 [project.scripts]
 shivaay-memory = "shivaay_memory.cli:main"
 shivaay-chat = "shivaay_memory.chat_cli:main"
+shivaay-semantic = "shivaay_memory.semantic_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
