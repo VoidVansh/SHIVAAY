@@ -8,6 +8,7 @@ import sys
 
 from .engine import MemoryEngine
 from .extraction import CandidateQueue, extract_from_json
+from .maintenance import MemoryMaintenance
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -77,6 +78,22 @@ def _parser() -> argparse.ArgumentParser:
     context.add_argument("--project")
     context.add_argument("--limit", type=int, default=8)
 
+    scan = sub.add_parser("maintenance-scan", help="Scan for possible duplicate/conflicting memories without changing them")
+    scan.add_argument("--project")
+    scan.add_argument("--limit", type=int, default=500)
+
+    maintenance = sub.add_parser("maintenance", help="List memory maintenance suggestions")
+    maintenance.add_argument("--status", choices=["pending", "applied", "dismissed", "stale", "all"], default="pending")
+    maintenance.add_argument("--limit", type=int, default=100)
+
+    apply_maintenance = sub.add_parser("apply-maintenance", help="Apply a reviewed maintenance suggestion")
+    apply_maintenance.add_argument("--id", required=True, type=int)
+    apply_maintenance.add_argument("--text", help="Explicit replacement text, recommended for conflicts")
+    apply_maintenance.add_argument("--reason", default="Reviewed memory maintenance")
+
+    dismiss_maintenance = sub.add_parser("dismiss-maintenance", help="Dismiss a maintenance suggestion")
+    dismiss_maintenance.add_argument("--id", required=True, type=int)
+
     sub.add_parser("stats", help="Show local memory counts")
     delete = sub.add_parser("delete", help="Permanently delete a memory (cannot be undone)")
     delete.add_argument("--id", type=int, required=True)
@@ -87,6 +104,7 @@ def main() -> None:
     args = _parser().parse_args()
     engine = MemoryEngine(args.db)
     queue = CandidateQueue(engine)
+    maintenance = MemoryMaintenance(engine)
     try:
         if args.command == "init":
             print(f"Initialized: {engine.store.db_path}")
@@ -128,6 +146,18 @@ def main() -> None:
             print("Summary saved.")
         elif args.command == "context":
             print(engine.build_context(args.query, project=args.project, limit=args.limit))
+        elif args.command == "maintenance-scan":
+            suggestions = maintenance.scan(project=args.project, limit=args.limit)
+            print(json.dumps(suggestions, indent=2, ensure_ascii=False))
+            print(f"Created {len(suggestions)} new suggestion(s). No memories were changed.", file=sys.stderr)
+        elif args.command == "maintenance":
+            print(json.dumps(maintenance.list(status=args.status, limit=args.limit), indent=2, ensure_ascii=False))
+        elif args.command == "apply-maintenance":
+            new_id = maintenance.apply(args.id, chosen_text=args.text, reason=args.reason)
+            print(f"Applied suggestion; saved corrected memory as #{new_id}. Previous memory preserved as superseded.")
+        elif args.command == "dismiss-maintenance":
+            maintenance.dismiss(args.id)
+            print("Maintenance suggestion dismissed.")
         elif args.command == "stats":
             stats = {"database": str(engine.store.db_path), **engine.stats()}
             stats["pending_candidates"] = len(queue.list(status="pending", limit=200))
