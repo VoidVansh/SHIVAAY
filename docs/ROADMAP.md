@@ -18,7 +18,8 @@
 - [x] Provider-neutral chat backend interface
 - [x] Local Ollama chat adapter and interactive terminal chat
 - [x] Local Ollama embedding adapter
-- [x] Candidate scoring for durability, future usefulness, confidence and sensitivity
+- [x] Candidate scoring for durability, future usefulness, confidence, sensitivity and capped repeated-mention evidence
+- [x] Track exact candidate recurrence without creating duplicate queue rows; migrate existing SQLite databases additively
 - [x] Review-first duplicate and possible-conflict suggestions
 - [x] User-configurable opt-in auto-save policy for high-confidence, low-risk candidates
 
