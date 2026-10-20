@@ -8,7 +8,7 @@ Each candidate receives transparent heuristic signals:
 - **Sensitivity risk:** obvious sensitive markers trigger a hard exclusion from automatic saving.
 - **Overall score:** weighted heuristic (40% durability, 35% usefulness, 25% confidence).
 
-Candidate rows retain a recurrence count and last-seen timestamp. Existing databases are upgraded with additive SQLite column migrations; old candidates start with a count of one. Repeated mentions update the existing candidate instead of creating a second row. This initial version counts exact text matches within the same project only; paraphrases are not yet clustered.
+Candidate rows retain a recurrence count and last-seen timestamp. Existing databases are upgraded with additive SQLite column migrations; old candidates start with a count of one. Repeated mentions update the existing candidate instead of creating a second row. Duplicate matching normalizes case, punctuation, and whitespace within the same project; paraphrases are not yet clustered. When opt-in auto-save is enabled, a repeated pending candidate is reevaluated against the current thresholds, while the default remains review-first.
 
 Scores help prioritize review; they are not calibrated probabilities. They can be wrong. The candidate queue also includes an `auto_save_decision` and `auto_save_reason` for each item, explaining whether it is in review, blocked by a safeguard, already reviewed, or eligible under the current policy. Changing the policy does not retroactively approve old queued items. Sensitive-memory checks in the memory engine remain authoritative.
 
