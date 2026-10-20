@@ -38,6 +38,19 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(self.engine.stats()["memories"], 0)
         self.assertEqual(self.queue.get_policy()["auto_save_enabled"], 0)
 
+    def test_auto_save_keeps_possible_conflicts_pending_for_review(self):
+        self.engine.add_memory("I prefer concise explanations.", category="preference",
+                               project="SHIVAAY", confidence=1.0, importance=5)
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        contradictory = MemoryCandidate(
+            "I do not prefer concise explanations.", category="preference",
+            project="SHIVAAY", confidence=0.99, importance=5,
+        )
+        ids = self.queue.propose([contradictory])
+        rows = {row["id"]: row for row in self.queue.list(status="all")}
+        self.assertEqual(rows[ids[0]]["status"], "pending")
+        self.assertEqual(self.engine.stats()["memories"], 1)
+
     def test_opt_in_auto_save_saves_only_high_confidence_candidate(self):
         self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
         high = MemoryCandidate("I prefer concise explanations.", category="preference",
