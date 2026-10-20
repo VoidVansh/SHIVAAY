@@ -58,6 +58,7 @@ class MemoryMaintenance:
     def scan(self, *, project: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
         """Create suggestions without changing active memories."""
         memories = self.engine.list_memories(project=project, limit=limit)
+        memories.sort(key=lambda item: item["id"])  # deterministic pair direction and review history
         created: list[dict[str, Any]] = []
         with self.engine.store.connect() as conn:
             for i, first in enumerate(memories):
