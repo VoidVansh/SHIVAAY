@@ -36,7 +36,10 @@
 - [x] SQLite backup/restore and database integrity checks
 - [x] Export/import in portable JSON format
 - [ ] Optional encryption at rest
+- [x] HTTP-level Ollama adapter tests against a temporary loopback server (without downloading a model)
 - [ ] End-to-end tests against a real local model
 - [x] Linux installation and first-run guide
 
 The checklist tracks implementation state, not a promise that untested behavior is production-ready. Semantic retrieval remains opt-in; when enabled, chat fuses lexical and semantic rankings and deduplicates memories by ID. Retrieved context has a configurable character budget, not a precise token budget. Backups use SQLite online backup and require explicit overwrite to replace existing files. Maintenance suggestions and candidate scores are heuristic. Auto-save is disabled by default; when explicitly enabled, it requires configured thresholds and excludes candidates flagged as sensitive. Scans never modify memories.
+
+The Ollama HTTP tests verify request shape, response validation, and rejection of remote/lookalike hosts without requiring Ollama or model weights. They do not substitute for a real-model quality/performance test on the target PC.
