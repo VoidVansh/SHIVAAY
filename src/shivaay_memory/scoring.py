@@ -37,13 +37,19 @@ def score_candidate(candidate):
     usefulness = min(1.0, usefulness + (0.08 if project_specific else 0.0))
     sensitive = any(marker in folded for marker in SENSITIVE_MARKERS)
     risk = 1.0 if sensitive else 0.0
-    total = 0.40 * durable + 0.35 * usefulness + 0.25 * confidence
+    recurrence_count = max(1, int(_get(candidate, "recurrence_count", 1)))
+    # Repetition is supporting evidence, not proof. Cap the boost so spam/repetition
+    # cannot override sensitivity or confidence safeguards.
+    recurrence = min(1.0, 0.5 + 0.1 * min(recurrence_count - 1, 5))
+    total = 0.36 * durable + 0.32 * usefulness + 0.22 * confidence + 0.10 * recurrence
     if sensitive:
         total = min(total, 0.2)
     return {
         "durability": round(durable, 3),
         "usefulness": round(usefulness, 3),
         "confidence": round(confidence, 3),
+        "recurrence": round(recurrence, 3),
+        "recurrence_count": recurrence_count,
         "sensitivity_risk": round(risk, 3),
         "score": round(total, 3),
         "auto_save_eligible": not sensitive and confidence >= 0.90 and total >= 0.85 and importance >= 3,
