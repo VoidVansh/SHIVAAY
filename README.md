@@ -58,7 +58,7 @@ shivaay-semantic search "make the app work without internet" --project SHIVAAY
 shivaay-semantic clean
 ```
 
-The initial indexing run embeds each active memory and may take time. Re-index after adding or correcting memories. Semantic search is optional and currently separate from the default chat CLI; the chat still uses lexical retrieval unless the application explicitly wires in the semantic index. See [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md).
+The initial indexing run embeds each active memory and may take time. Re-index after adding or correcting memories. Semantic search is optional; enable it in the interactive chat with `--semantic`. It indexes current active memories at startup, so re-run `shivaay-semantic index` after approving or correcting memories. See [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md).
 
 ## Memory tools
 
