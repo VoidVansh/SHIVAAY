@@ -22,6 +22,8 @@
 - [x] Track exact candidate recurrence without creating duplicate queue rows; migrate existing SQLite databases additively
 - [x] Review-first duplicate and possible-conflict suggestions
 - [x] User-configurable opt-in auto-save policy for high-confidence, low-risk candidates
+- [x] Reevaluate pending candidates after repeated mentions when opt-in auto-save is enabled
+- [x] Detect explicit same-claim-family update cues and keep possible memory revisions pending for review
 
 ## Milestone 4 — Retrieval quality
 - [x] Optional local embeddings and semantic retrieval
