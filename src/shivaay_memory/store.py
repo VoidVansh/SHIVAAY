@@ -11,6 +11,16 @@ from typing import Any
 DEFAULT_DB = Path.home() / ".local" / "share" / "shivaay" / "memory.sqlite3"
 
 
+class _ClosingConnection(sqlite3.Connection):
+    """SQLite transaction context that also closes the connection on exit."""
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 class MemoryStore:
     """Owns the local SQLite database and its schema."""
 
@@ -21,7 +31,7 @@ class MemoryStore:
         self._initialize()
 
     def connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn = sqlite3.connect(self.db_path, timeout=10, factory=_ClosingConnection)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA busy_timeout = 10000")

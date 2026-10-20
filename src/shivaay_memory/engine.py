@@ -141,11 +141,16 @@ class MemoryEngine:
                 age_days = 365
             recency = math.exp(-age_days / 180)
             lexical = 1.0 / (1.0 + max(0.0, float(item.get("lexical_rank") or 0)))
+            # A small usage boost lets repeatedly useful memories become easier to recall,
+            # without allowing popularity to overwhelm relevance or explicit confidence.
+            access_count = max(0, int(item.get("access_count") or 0))
+            usage = min(1.0, math.log1p(access_count) / math.log1p(10))
             score = (
-                0.42 * lexical
-                + 0.24 * (item["importance"] / 5)
-                + 0.20 * item["confidence"]
-                + 0.14 * recency
+                0.38 * lexical
+                + 0.22 * (item["importance"] / 5)
+                + 0.18 * item["confidence"]
+                + 0.12 * recency
+                + 0.10 * usage
             )
             item["retrieval_score"] = round(score, 4)
             scored.append(item)
@@ -201,6 +206,24 @@ class MemoryEngine:
                 count += 1
         return count
 
+    def get_conversation_messages(
+        self, conversation_id: str, *, limit: int = 12
+    ) -> list[dict[str, Any]]:
+        """Return the most recent messages for a conversation in chronological order."""
+        if not conversation_id.strip():
+            return []
+        bounded_limit = max(1, min(int(limit), 500))
+        rows = self.store.execute(
+            """SELECT id, conversation_id, project, role, content, created_at, metadata
+               FROM conversations
+               WHERE conversation_id=?
+               ORDER BY id DESC
+               LIMIT ?""",
+            (conversation_id, bounded_limit),
+        )
+        rows.reverse()
+        return rows
+
     def search_conversations(
         self, query: str, *, project: str | None = None, limit: int = 10
     ) -> list[dict[str, Any]]:
@@ -242,36 +265,235 @@ class MemoryEngine:
         )
         return rows[0] if rows else None
 
-    def build_context(self, query: str, *, project: str | None = None, limit: int = 8) -> str:
-        """Create a compact, source-labelled context block for a model prompt."""
+    def search_conversation_summaries(
+        self, query: str, *, project: str | None = None, limit: int = 3,
+        exclude_conversation_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Find relevant prior conversation summaries using conservative token overlap."""
+        stopwords = {"the", "and", "for", "that", "this", "with", "from", "what",
+                     "when", "where", "which", "would", "could", "should", "about",
+                     "have", "has", "was", "were", "are", "you", "your", "our",
+                     "into", "then", "than", "how", "why", "did", "does", "use"}
+        query_terms = set(re.findall(r"[\w-]{2,}", query.casefold())) - stopwords
+        if not query_terms:
+            return []
+        where = ["s.scope='conversation'"]
+        params: list[Any] = []
+        if exclude_conversation_id:
+            where.append("s.scope_key <> ?")
+            params.append(exclude_conversation_id)
+        if project:
+            where.append("EXISTS (SELECT 1 FROM conversations c WHERE c.conversation_id=s.scope_key AND c.project=?)")
+            params.append(project)
+        rows = self.store.execute(
+            "SELECT s.scope_key, s.content, s.source_ref, s.updated_at FROM summaries s WHERE "
+            + " AND ".join(where) + " ORDER BY s.updated_at DESC LIMIT 500",
+            tuple(params),
+        )
+        ranked = []
+        for row in rows:
+            terms = set(re.findall(r"[\w-]{2,}", row["content"].casefold())) - stopwords
+            overlap = query_terms & terms
+            if overlap:
+                item = dict(row)
+                item["summary_score"] = round(len(overlap) / max(1, len(query_terms)), 4)
+                ranked.append(item)
+        ranked.sort(key=lambda item: (item["summary_score"], item["updated_at"]), reverse=True)
+        return ranked[:max(1, min(int(limit), 10))]
+
+    def build_context(
+        self, query: str, *, project: str | None = None, limit: int = 8,
+        memory_override: list[dict[str, Any]] | None = None, max_chars: int = 8000,
+        exclude_conversation_id: str | None = None,
+    ) -> str:
+        """Pack relevant context into a bounded, source-labelled character budget.
+
+        This is a dependency-free safety bound, not an exact model-token counter.
+        Higher-priority summaries and ranked memories are considered before older
+        conversation excerpts. Individual entries are clipped only when needed
+        to preserve their source label within the remaining budget.
+        """
+        budget = max(500, min(int(max_chars), 50000))
         chunks: list[str] = []
-        summary = self.get_summary("project", project) if project else None
-        if summary:
-            chunks.append(f"[Project summary: {project}]\n{summary['content']}")
+        used = 0
+
+        def add_group(title: str, entries: list[str]) -> int:
+            nonlocal used
+            if not entries or used >= budget:
+                return 0
+            heading = f"[{title}]"
+            if used + len(heading) + 1 > budget:
+                return 0
+            chunks.append(heading)
+            used += len(heading) + 1
+            added = 0
+            for entry in entries:
+                if used >= budget:
+                    break
+                remaining = budget - used - 1
+                if remaining <= 0:
+                    break
+                if len(entry) > remaining:
+                    # Preserve the beginning/source metadata; do not split into another entry.
+                    if remaining >= 80:
+                        entry = entry[:remaining - 1].rstrip() + "…"
+                    else:
+                        break
+                chunks.append(entry)
+                used += len(entry) + 1
+                added += 1
+                if used >= budget:
+                    break
+            return added
+
+        project_summary = self.get_summary("project", project) if project else None
         user_summary = self.get_summary("user", "default")
+        if project_summary:
+            content = project_summary["content"].strip()
+            source_ref = f"; source_ref={project_summary['source_ref']}" if project_summary.get("source_ref") else ""
+            add_group(f"Project summary: {project}{source_ref}", [content[:1600] + ("…" if len(content) > 1600 else "")])
         if user_summary:
-            chunks.append(f"[User summary]\n{user_summary['content']}")
-        memories = self.retrieve(query, project=project, limit=limit)
-        if memories:
-            chunks.append("[Relevant saved memories]")
-            for m in memories:
-                chunks.append(
-                    f"- (memory #{m['id']}; source={m['source_type']}; "
-                    f"confidence={m['confidence']:.2f}; project={m['project']}) {m['text']}"
-                )
-        conversations = self.search_conversations(query, project=project, limit=min(limit, 5))
-        if conversations:
-            chunks.append("[Relevant conversation excerpts — verify against full conversation if needed]")
-            for c in conversations:
-                excerpt = c["content"].replace("\n", " ")
-                if len(excerpt) > 500:
-                    excerpt = excerpt[:497] + "..."
-                chunks.append(f"- ({c['role']}, conversation={c['conversation_id']}) {excerpt}")
+            content = user_summary["content"].strip()
+            source_ref = f"; source_ref={user_summary['source_ref']}" if user_summary.get("source_ref") else ""
+            add_group(f"User summary{source_ref}", [content[:1600] + ("…" if len(content) > 1600 else "")])
+
+        prior_summaries = self.search_conversation_summaries(
+            query, project=project, limit=3, exclude_conversation_id=exclude_conversation_id
+        )
+        summary_entries = [
+            f"- (conversation={item['scope_key']}; source_ref={item.get('source_ref') or item['scope_key']}; match={item['summary_score']:.2f}) {item['content']}"
+            for item in prior_summaries
+        ]
+        add_group("Related prior conversation summaries — model-generated notes, not verified facts",
+                  summary_entries)
+
+        memories = memory_override if memory_override is not None else self.retrieve(query, project=project, limit=limit)
+        memory_entries = []
+        for memory in memories[:max(1, min(limit, 50))]:
+            text = memory["text"].replace("\n", " ").strip()
+            if len(text) > 1200:
+                text = text[:1197] + "..."
+            score = memory.get("hybrid_score", memory.get("retrieval_score"))
+            score_label = f"; score={score:.3f}" if isinstance(score, (int, float)) else ""
+            source_ref = str(memory.get("source_ref") or "")[:100]
+            source_label = f"; ref={source_ref}" if source_ref else ""
+            memory_entries.append(
+                f"- (memory #{memory['id']}; category={memory['category']}; source={memory['source_type']}"
+                f"{source_label}; confidence={memory['confidence']:.2f}; importance={memory['importance']}"
+                f"; project={memory['project']}{score_label}) {text}"
+            )
+        included_memories = add_group("Relevant saved memories", memory_entries)
+        self.mark_accessed([memory["id"] for memory in memories[:included_memories]])
+
+        conversations = [
+            item for item in self.search_conversations(query, project=project, limit=min(limit, 5))
+            if not exclude_conversation_id or item["conversation_id"] != exclude_conversation_id
+        ]
+        conversation_entries = []
+        for item in conversations:
+            excerpt = item["content"].replace("\n", " ").strip()
+            if len(excerpt) > 500:
+                excerpt = excerpt[:497] + "..."
+            conversation_entries.append(
+                f"- ({item['role']}, conversation={item['conversation_id']}) {excerpt}"
+            )
+        add_group("Relevant conversation excerpts — verify against full conversation if needed",
+                  conversation_entries)
         return "\n".join(chunks) if chunks else "[No relevant saved context found.]"
 
-    def delete_memory(self, memory_id: int) -> bool:
-        """Explicit hard deletion; caller should confirm with the user first."""
+    def mark_accessed(self, memory_ids: list[int]) -> int:
+        """Record memories actually shown in a built context, without changing their content."""
+        ids = list(dict.fromkeys(int(memory_id) for memory_id in memory_ids))
+        if not ids:
+            return 0
+        now_sql = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
         with self.store.connect() as conn:
+            changed = 0
+            for memory_id in ids:
+                cur = conn.execute(
+                    f"UPDATE memories SET access_count=access_count+1, last_accessed_at={now_sql} "
+                    "WHERE id=? AND status='active'",
+                    (memory_id,),
+                )
+                changed += cur.rowcount
+            return changed
+
+    def delete_conversation(
+        self, conversation_id: str, *, include_linked_memories: bool = False
+    ) -> dict[str, int]:
+        """Delete an archived conversation and its summary; linked memories are opt-in.
+
+        A memory is considered linked only when its source_ref exactly matches
+        the conversation ID. This prevents broad, accidental deletion.
+        """
+        conversation_id = conversation_id.strip()
+        if not conversation_id:
+            raise ValueError("conversation_id cannot be empty.")
+        linked_ids: list[int] = []
+        if include_linked_memories:
+            linked_ids = [row["id"] for row in self.store.execute(
+                "SELECT id FROM memories WHERE source_ref=?", (conversation_id,)
+            )]
+            for memory_id in linked_ids:
+                self.delete_memory(memory_id)
+        with self.store.connect() as conn:
+            message_count = conn.execute(
+                "SELECT COUNT(*) FROM conversations WHERE conversation_id=?",
+                (conversation_id,),
+            ).fetchone()[0]
+            summary_count = conn.execute(
+                "SELECT COUNT(*) FROM summaries WHERE scope='conversation' AND scope_key=?",
+                (conversation_id,),
+            ).fetchone()[0]
+            conn.execute("DELETE FROM conversations WHERE conversation_id=?", (conversation_id,))
+            conn.execute(
+                "DELETE FROM summaries WHERE scope='conversation' AND scope_key=?",
+                (conversation_id,),
+            )
+            tables = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            candidate_count = 0
+            if "memory_candidates" in tables:
+                cur = conn.execute(
+                    "DELETE FROM memory_candidates WHERE source_ref=?", (conversation_id,)
+                )
+                candidate_count = cur.rowcount
+        return {
+            "messages_deleted": int(message_count),
+            "summaries_deleted": int(summary_count),
+            "candidates_deleted": int(candidate_count),
+            "linked_memories_deleted": len(linked_ids),
+        }
+
+    def delete_memory(self, memory_id: int) -> bool:
+        """Hard-delete a memory and clean derived references, preserving other records.
+
+        Conversation archives are intentionally untouched; they are a separate
+        source of data and must be deleted explicitly if the user wants them gone.
+        """
+        with self.store.connect() as conn:
+            exists = conn.execute("SELECT 1 FROM memories WHERE id=?", (memory_id,)).fetchone()
+            if not exists:
+                return False
+            tables = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            # Suggestions reference memories with restrictive foreign keys; remove
+            # those suggestions before deleting the referenced record.
+            if "maintenance_suggestions" in tables:
+                conn.execute(
+                    """DELETE FROM maintenance_suggestions
+                       WHERE memory_id=? OR compared_memory_id=? OR applied_memory_id=?""",
+                    (memory_id, memory_id, memory_id),
+                )
+            if "memory_embeddings" in tables:
+                conn.execute("DELETE FROM memory_embeddings WHERE memory_id=?", (memory_id,))
+            if "memory_candidates" in tables:
+                # Keep the candidate audit trail but remove its dangling memory pointer.
+                conn.execute("UPDATE memory_candidates SET memory_id=NULL WHERE memory_id=?", (memory_id,))
+            # A newer memory may point to this one as its superseded replacement.
+            conn.execute("UPDATE memories SET superseded_by=NULL WHERE superseded_by=?", (memory_id,))
             cur = conn.execute("DELETE FROM memories WHERE id=?", (memory_id,))
             return cur.rowcount > 0
 

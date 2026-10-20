@@ -1,0 +1,169 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from shivaay_memory import MemoryEngine
+from shivaay_memory.extraction import CandidateQueue, MemoryCandidate
+from shivaay_memory.scoring import score_candidate
+
+
+class ScoringTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.engine = MemoryEngine(str(Path(self.tempdir.name) / "memory.sqlite3"))
+        self.queue = CandidateQueue(self.engine)
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def test_durable_important_candidate_scores_higher_than_temporary(self):
+        durable = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                  project="SHIVAAY", confidence=0.95, importance=5)
+        temporary = MemoryCandidate("I need this today.", category="general",
+                                    confidence=0.7, importance=1)
+        self.assertGreater(score_candidate(durable)["score"], score_candidate(temporary)["score"])
+
+    def test_sensitive_candidate_never_eligible_for_auto_save(self):
+        candidate = MemoryCandidate("My password is secret-value", category="preference",
+                                     confidence=1.0, importance=5)
+        score = score_candidate(candidate)
+        self.assertEqual(score["sensitivity_risk"], 1.0)
+        self.assertFalse(score["auto_save_eligible"])
+
+    def test_auto_save_is_disabled_by_default(self):
+        candidate = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                    project="SHIVAAY", confidence=0.99, importance=5)
+        ids = self.queue.propose([candidate])
+        self.assertEqual(self.queue.list(status="pending")[0]["id"], ids[0])
+        self.assertEqual(self.engine.stats()["memories"], 0)
+        self.assertEqual(self.queue.get_policy()["auto_save_enabled"], 0)
+        pending = self.queue.list(status="pending")[0]
+        self.assertEqual(pending["auto_save_decision"], "review")
+        self.assertIn("disabled", pending["auto_save_reason"])
+
+    def test_auto_save_keeps_sensitive_candidates_pending(self):
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        candidate = MemoryCandidate(
+            "My API key is a private credential.", category="preference",
+            project="SHIVAAY", confidence=0.99, importance=5,
+        )
+        ids = self.queue.propose([candidate])
+        rows = {row["id"]: row for row in self.queue.list(status="all")}
+        self.assertEqual(rows[ids[0]]["status"], "pending")
+        self.assertEqual(self.engine.stats()["memories"], 0)
+        pending = self.queue.list(status="pending")[0]
+        self.assertEqual(pending["auto_save_decision"], "blocked")
+        self.assertIn("Sensitivity", pending["auto_save_reason"])
+
+    def test_auto_save_keeps_possible_conflicts_pending_for_review(self):
+        self.engine.add_memory("I prefer concise explanations.", category="preference",
+                               project="SHIVAAY", confidence=1.0, importance=5)
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        contradictory = MemoryCandidate(
+            "I do not prefer concise explanations.", category="preference",
+            project="SHIVAAY", confidence=0.99, importance=5,
+        )
+        ids = self.queue.propose([contradictory])
+        rows = {row["id"]: row for row in self.queue.list(status="all")}
+        self.assertEqual(rows[ids[0]]["status"], "pending")
+        self.assertEqual(self.engine.stats()["memories"], 1)
+        pending = self.queue.list(status="pending")[0]
+        self.assertEqual(pending["auto_save_decision"], "blocked")
+        self.assertIn("contradiction", pending["auto_save_reason"])
+
+    def test_opt_in_auto_save_saves_only_high_confidence_candidate(self):
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        high = MemoryCandidate("I prefer concise explanations.", category="preference",
+                               project="SHIVAAY", confidence=0.99, importance=5)
+        low = MemoryCandidate("I plan to build a project later.", category="goal",
+                              project="SHIVAAY", confidence=0.72, importance=4)
+        ids = self.queue.propose([high, low])
+        rows = {row["id"]: row for row in self.queue.list(status="all")}
+        self.assertEqual(rows[ids[0]]["status"], "approved")
+        self.assertEqual(rows[ids[1]]["status"], "pending")
+        self.assertEqual(self.engine.stats()["memories"], 1)
+
+    def test_repeated_candidate_increments_recurrence_without_duplicate_row(self):
+        candidate = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                    project="SHIVAAY", confidence=0.72, importance=3)
+        first_ids = self.queue.propose([candidate], source_ref="chat-one")
+        second_ids = self.queue.propose([candidate], source_ref="chat-two")
+        self.assertEqual(len(first_ids), 1)
+        self.assertEqual(second_ids, [])
+        rows = self.queue.list(status="pending")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["recurrence_count"], 2)
+        self.assertEqual(rows[0]["score_recurrence_count"], 2)
+        self.assertGreaterEqual(rows[0]["score_recurrence"], 0.6)
+
+    def test_explicit_memory_update_stays_pending_under_auto_save(self):
+        self.engine.add_memory("I prefer concise explanations.", category="preference",
+                               project="SHIVAAY", confidence=1.0, importance=5)
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        candidate = MemoryCandidate(
+            "Actually, I prefer detailed explanations.", category="preference",
+            project="SHIVAAY", confidence=0.99, importance=5,
+        )
+        ids = self.queue.propose([candidate])
+        self.assertEqual(len(ids), 1)
+        self.assertEqual(self.engine.stats()["memories"], 1)
+        row = self.queue.list(status="pending")[0]
+        self.assertEqual(row["auto_save_decision"], "blocked")
+        self.assertIn("update", row["auto_save_reason"])
+
+    def test_repeated_pending_candidate_is_rechecked_by_opt_in_auto_save(self):
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        first = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                project="SHIVAAY", confidence=0.89, importance=5)
+        ids = self.queue.propose([first], source_ref="chat-one")
+        self.assertEqual(len(ids), 1)
+        self.assertEqual(self.queue.list(status="pending")[0]["status"], "pending")
+        repeated = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                   project="SHIVAAY", confidence=0.91, importance=5)
+        self.assertEqual(self.queue.propose([repeated], source_ref="chat-two"), [])
+        self.assertEqual(self.engine.stats()["memories"], 1)
+        rows = self.queue.list(status="approved")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["recurrence_count"], 2)
+
+    def test_recurrence_improves_score_but_cannot_override_sensitive_gate(self):
+        one = {"text": "I prefer concise explanations.", "category": "preference",
+               "confidence": 0.8, "importance": 4, "recurrence_count": 1}
+        repeated = {**one, "recurrence_count": 5}
+        self.assertGreater(score_candidate(repeated)["score"], score_candidate(one)["score"])
+        sensitive = {**repeated, "text": "My API key is private", "confidence": 1.0}
+        result = score_candidate(sensitive)
+        self.assertEqual(result["sensitivity_risk"], 1.0)
+        self.assertFalse(result["auto_save_eligible"])
+
+    def test_existing_candidate_database_is_migrated_additively(self):
+        legacy_path = Path(self.tempdir.name) / "legacy.sqlite3"
+        legacy_engine = MemoryEngine(str(legacy_path))
+        with legacy_engine.store.connect() as conn:
+            conn.execute("""
+                CREATE TABLE memory_candidates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    text TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    project TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT,
+                    confidence REAL NOT NULL,
+                    importance INTEGER NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    memory_id INTEGER,
+                    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+                    reviewed_at TEXT
+                )
+            """)
+            conn.execute("""
+                INSERT INTO memory_candidates
+                (text, category, project, source_type, confidence, importance, reason)
+                VALUES ('I prefer clear examples.', 'preference', 'SHIVAAY',
+                        'user_statement', 0.72, 3, 'legacy candidate')
+            """)
+        migrated = CandidateQueue(legacy_engine).list(status="pending")
+        self.assertEqual(len(migrated), 1)
+        self.assertEqual(migrated[0]["recurrence_count"], 1)
+        self.assertTrue(migrated[0]["last_seen_at"])

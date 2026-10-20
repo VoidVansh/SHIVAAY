@@ -1,41 +1,41 @@
-# SHIVAAY Memory Architecture (Milestone 1)
+# SHIVAAY Memory Architecture
 
-## Data flow
+## Runtime data flow
 
-1. **Capture** — the host app passes messages and candidate memories to the library.
-2. **Evaluate** — callers label source type, confidence, importance, project and sensitivity. This version provides guardrails but does not yet include an LLM-based automatic extractor.
-3. **Persist** — SQLite stores individual memories, conversation messages and replaceable summaries. FTS5 indexes text.
-4. **Retrieve** — lexical search narrows candidates; ranking blends lexical match, importance, confidence and recency.
-5. **Inject** — `build_context()` returns a source-labelled text block for the model prompt.
-6. **Correct** — corrections create a new record and mark the old record superseded, preserving provenance.
-7. **Review** — list/search/delete APIs and CLI allow the owner to inspect and control saved data.
+1. **Capture** — the chat host archives user and assistant turns. Candidate extraction is opt-in and examines user messages, not assistant claims.
+2. **Evaluate** — candidates carry category, project, source, confidence, importance and a reason. Transparent heuristics estimate durability, usefulness and sensitivity risk.
+3. **Review or save** — proposals enter a SQLite queue. By default they require approval. Auto-save can be enabled explicitly with thresholds, but sensitive candidates and likely negation-based conflicts with active memories remain pending. Queue output explains the decision.
+4. **Persist** — SQLite stores individual memories, conversation messages, replaceable summaries, candidate decisions and maintenance suggestions. FTS5 indexes searchable text.
+5. **Retrieve** — lexical search ranks by relevance, importance, confidence, recency and bounded recall-frequency feedback. Optional local Ollama embeddings provide semantic retrieval; chat fuses lexical and semantic rankings when enabled.
+6. **Pack context** — the engine builds source-labelled context under a configurable character budget. The budget is a dependency-free approximation, not an exact model-token count.
+7. **Generate** — the included chat adapter calls Ollama over a loopback HTTP endpoint only. It has no cloud fallback and rejects non-loopback hosts.
+8. **Summarize and resume** — periodic summaries compact recent turns; on restart, the chat can rebuild the unsummarized window from the local archive.
+9. **Correct and maintain** — corrections supersede older memory records rather than silently rewriting history. Duplicate/conflict scans create review suggestions and never change memories on their own.
+10. **Inspect and recover** — CLI commands expose memory provenance, database health, candidate policy, backups, restore, and portable JSON export/import.
 
-## Memory types
+## Stored record types
 
-- **Individual memory:** one durable claim, preference, decision or project detail.
-- **Conversation archive:** source material for later search; it is not automatically treated as fact.
-- **Summary:** compact, replaceable overview for the user, a project or a conversation.
-- **Provenance:** user statement, assistant inference, conversation summary, external source or user correction.
+- **Individual memory:** a durable claim, preference, decision, goal or project detail.
+- **Conversation archive:** the source conversation, retained separately from curated memory.
+- **Summary:** a compact, replaceable overview for the user, a project or a conversation.
+- **Candidate:** a proposed memory that can be pending, approved, rejected or marked duplicate.
+- **Maintenance suggestion:** a proposed duplicate/conflict review action; it must be applied or dismissed explicitly.
+- **Provenance:** the source type/reference and confidence attached to saved claims, so user statements and assistant inferences can remain distinguishable.
 
-## Safety and reliability
+## Privacy and safety boundaries
 
-- Sensitive memory requires explicit approval.
-- Basic sensitive-text heuristics block some likely secrets; heuristics are not a perfect detector.
-- Inferences should have lower confidence and remain labelled as inferences.
-- Superseded memories are excluded from default retrieval but retained for audit/history.
-- Deleting a memory is a permanent database action. Conversation archive entries are currently separate and are not deleted by deleting a memory.
-- Do not store the database in the Git repository. The repository contains source code only.
+- Memory storage defaults to a local SQLite database at `~/.local/share/shivaay/memory.sqlite3`; override it with `SHIVAAY_MEMORY_DB` or the CLI's `--db`.
+- The included Ollama chat and embedding adapters use loopback endpoints only. A future remote backend would change the data boundary and must be disclosed.
+- Candidate auto-save is disabled by default. The sensitivity and conflict checks are heuristics, not perfect detection or proof that a claim is true.
+- Conversation archives can contain personal information. Avoid putting passwords, API keys or other secrets into chats that are archived.
+- Backups are verified SQLite copies, not encrypted files. Optional encryption at rest remains open.
+- Memory retrieval is not model training or fine-tuning. It supplies stored context at inference time.
 
-## Current limitations / next milestones
+## Remaining milestones
 
-This is a foundation, not yet a complete ChatGPT-equivalent memory system.
+- Integrate this memory runtime with SHIVAAY's actual desktop HUD.
+- Add optional encryption at rest.
+- Run end-to-end quality and performance tests with a real local model on the target PC.
+- Improve contradiction detection and sensitivity classification beyond heuristics.
 
-1. Add a model-provider interface and automatic memory extraction with explicit structured output.
-2. Add importance/usefulness scoring, duplicate detection, merge proposals and conflict detection.
-3. Add semantic retrieval using an optional local embedding model, keeping FTS5 as a fallback.
-4. Add bounded conversation-window summaries and source links to archived messages.
-5. Add a review queue for uncertain or sensitive candidates, user correction UX, and memory export/import.
-6. Add integration tests against SHIVAAY's eventual chat loop and a small local model.
-7. Add database encryption option and backup/restore before storing sensitive personal history.
-
-The engine does not train or fine-tune the model. It provides persistent context at inference time. If a remote API is used, prompt context sent to it is processed by that provider.
+The repository has automated tests on Python 3.11, 3.12 and 3.13, including HTTP-level tests against a temporary loopback server. Those tests validate the adapter and orchestration contract without proving model quality or performance on the user's machine.
