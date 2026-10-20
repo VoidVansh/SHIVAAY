@@ -30,7 +30,7 @@
 ## Milestone 5 — Application integration and reliability
 - [x] Provider-neutral session integration and local chat CLI
 - [ ] Integrate memory runtime with SHIVAAY's actual desktop HUD
-- [x] SQLite backup/restore and database integrity checks\n- [ ] Export/import in portable JSON format
+- [x] SQLite backup/restore and database integrity checks\n- [x] Export/import in portable JSON format
 - [ ] Optional encryption at rest
 - [ ] End-to-end tests against a real local model and Linux installation guide
 

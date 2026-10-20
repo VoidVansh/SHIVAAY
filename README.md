@@ -75,6 +75,7 @@ shivaay-memory maintenance-scan --project SHIVAAY
 shivaay-memory maintenance --status pending
 shivaay-memory check-db
 shivaay-memory backup --file ~/shivaay-backups/memory.sqlite3
+shivaay-memory export-json --file ~/shivaay-backups/shivaay-memory.json
 shivaay-memory check-db
 shivaay-memory backup --file ~/shivaay-backups/memory.sqlite3
 ```
@@ -95,4 +96,4 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 python -m unittest discover -s tests -v
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md), [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md), and [docs/CONTEXT_BUDGET.md](docs/CONTEXT_BUDGET.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md), [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md), [docs/PORTABLE_JSON.md](docs/PORTABLE_JSON.md), and [docs/CONTEXT_BUDGET.md](docs/CONTEXT_BUDGET.md).

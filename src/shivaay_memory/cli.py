@@ -12,6 +12,7 @@ from .extraction import CandidateQueue, extract_from_json
 from .maintenance import MemoryMaintenance
 from .backup import backup_database, check_database, restore_database
 from .store import DEFAULT_DB
+from .portable import export_json, import_json
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -20,6 +21,15 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init", help="Initialize the database and print its location")
+
+    export = sub.add_parser("export-json", help="Export core memory data to portable JSON")
+    export.add_argument("--file", required=True)
+    export.add_argument("--overwrite", action="store_true")
+
+    imp = sub.add_parser("import-json", help="Import core memory data from portable JSON")
+    imp.add_argument("--file", required=True)
+    imp.add_argument("--allow-sensitive", action="store_true",
+                     help="Explicitly allow importing records marked sensitive")
 
     backup = sub.add_parser("backup", help="Create a verified SQLite memory backup")
     backup.add_argument("--file", required=True, help="Destination backup path")
@@ -121,22 +131,26 @@ def _parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _parser().parse_args()
-    if args.command == "restore":
-        destination = args.db or os.environ.get("SHIVAAY_MEMORY_DB") or str(DEFAULT_DB)
-        try:
-            print(json.dumps(restore_database(args.file, destination, overwrite=args.overwrite), indent=2))
-        except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            raise SystemExit(2) from exc
-        return
-    if args.command == "restore":
-        destination = args.db or os.environ.get("SHIVAAY_MEMORY_DB") or str(DEFAULT_DB)
-        try:
-            print(json.dumps(restore_database(args.file, destination, overwrite=args.overwrite), indent=2))
-        except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            raise SystemExit(2) from exc
-        return
+    database = args.db or os.environ.get("SHIVAAY_MEMORY_DB") or str(DEFAULT_DB)
+    try:
+        if args.command == "restore":
+            print(json.dumps(restore_database(args.file, database, overwrite=args.overwrite), indent=2))
+            return
+        if args.command == "backup":
+            print(json.dumps(backup_database(database, args.file, overwrite=args.overwrite), indent=2))
+            return
+        if args.command == "check-db":
+            print(json.dumps(check_database(args.file or database), indent=2))
+            return
+        if args.command == "export-json":
+            print(json.dumps(export_json(database, args.file, overwrite=args.overwrite), indent=2))
+            return
+        if args.command == "import-json":
+            print(json.dumps(import_json(database, args.file, allow_sensitive=args.allow_sensitive), indent=2))
+            return
+    except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
     engine = MemoryEngine(args.db)
     queue = CandidateQueue(engine)
     maintenance = MemoryMaintenance(engine)

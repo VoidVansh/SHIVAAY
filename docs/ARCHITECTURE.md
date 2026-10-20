@@ -34,8 +34,8 @@ This is a foundation, not yet a complete ChatGPT-equivalent memory system.
 2. Add importance/usefulness scoring, duplicate detection, merge proposals and conflict detection.
 3. Add semantic retrieval using an optional local embedding model, keeping FTS5 as a fallback.
 4. Add bounded conversation-window summaries and source links to archived messages.
-5. Add a review queue for uncertain or sensitive candidates, user correction UX, and memory export/import.
+5. Add a review queue for uncertain or sensitive candidates and user correction UX. Core memory, conversation archives and summaries now support portable JSON export/import; embeddings and review queues are intentionally rebuilt or omitted.
 6. Add integration tests against SHIVAAY's eventual chat loop and a small local model.
-7. Add database encryption option and backup/restore before storing sensitive personal history.
+7. Add optional database encryption at rest; verified SQLite backup/restore is available, but backup files are not encrypted.
 
 The engine does not train or fine-tune the model. It provides persistent context at inference time. If a remote API is used, prompt context sent to it is processed by that provider.
