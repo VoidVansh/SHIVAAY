@@ -34,6 +34,16 @@ def _same_subject(a: str, b: str) -> bool:
     return len(ta & tb) / max(1, min(len(ta), len(tb))) >= 0.72
 
 
+def possible_conflict_text(a: str, b: str) -> bool:
+    """Return a conservative warning signal for shared claims with differing negation.
+
+    This is a heuristic guardrail, not natural-language entailment. Callers should
+    route matches to review rather than automatically choosing either statement.
+    """
+    negation_differs = bool(_tokens(a) & _NEGATIONS) != bool(_tokens(b) & _NEGATIONS)
+    return _same_subject(a, b) and negation_differs and _similarity(a, b) >= 0.45
+
+
 class MemoryMaintenance:
     """Find potential maintenance actions and persist them for human review."""
 
