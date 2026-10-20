@@ -51,6 +51,14 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertTrue(self.engine.search_conversations("SQLite local database", project="SHIVAAY"))
         self.assertIn("conversation=chat-1", self.engine.build_context("SQLite", project="SHIVAAY"))
 
+    def test_context_includes_memory_provenance(self):
+        self.engine.add_memory("SHIVAAY uses local SQLite.", project="SHIVAAY",
+                               source_ref="conversation-42", category="decision", importance=5)
+        context = self.engine.build_context("local SQLite", project="SHIVAAY")
+        self.assertIn("ref=conversation-42", context)
+        self.assertIn("category=decision", context)
+        self.assertIn("importance=5", context)
+
     def test_context_respects_character_budget(self):
         self.engine.add_memory("Important local memory " + ("details " * 200), project="SHIVAAY", importance=5)
         self.engine.save_summary("project", "SHIVAAY", "Project summary " + ("context " * 500))

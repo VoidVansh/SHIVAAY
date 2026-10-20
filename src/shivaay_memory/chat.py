@@ -82,21 +82,25 @@ class MemoryChat:
         text = user_message.strip()
         if not text:
             raise ValueError("Message cannot be empty.")
-        memory_context = self.session.context_for(text, project=self.project, limit=8, max_chars=self.context_chars)
         if self.semantic_index is not None and hasattr(self.semantic_index, "hybrid_search"):
             # Real local index fuses lexical + semantic ranks, deduplicating by memory ID.
             hybrid_hits = self.semantic_index.hybrid_search(text, project=self.project, limit=8)
             memory_context = self.session.context_for(
-                text, project=self.project, limit=8, memory_override=hybrid_hits, max_chars=self.context_chars
+                text, project=self.project, limit=8, memory_override=hybrid_hits,
+                max_chars=self.context_chars
             )
-        elif self.semantic_index is not None:
-            # Compatibility path for simple custom adapters that only implement search().
-            semantic_hits = self.semantic_index.search(text, project=self.project, limit=4)
-            if semantic_hits:
-                block = ["[Semantically related saved memories — similarity is a relevance signal, not proof]"]
-                for memory in semantic_hits:
-                    block.append(f"- (memory #{memory['id']}; similarity={memory['semantic_score']:.3f}; source={memory['source_type']}; confidence={memory['confidence']:.2f}) {memory['text']}")
-                memory_context += "\n" + "\n".join(block)
+        else:
+            memory_context = self.session.context_for(
+                text, project=self.project, limit=8, max_chars=self.context_chars
+            )
+            if self.semantic_index is not None:
+                # Compatibility path for simple custom adapters that only implement search().
+                semantic_hits = self.semantic_index.search(text, project=self.project, limit=4)
+                if semantic_hits:
+                    block = ["[Semantically related saved memories — similarity is a relevance signal, not proof]"]
+                    for memory in semantic_hits:
+                        block.append(f"- (memory #{memory['id']}; similarity={memory['semantic_score']:.3f}; source={memory['source_type']}; confidence={memory['confidence']:.2f}) {memory['text']}")
+                    memory_context += "\n" + "\n".join(block)
         system = (
             "You are SHIVAAY, an honest, helpful personal AI companion. Use saved context when relevant, "
             "but treat it as fallible evidence: prefer the user's latest explicit correction, do not invent "

@@ -287,10 +287,12 @@ class MemoryEngine:
         user_summary = self.get_summary("user", "default")
         if project_summary:
             content = project_summary["content"].strip()
-            add_group(f"Project summary: {project}", [content[:1600] + ("…" if len(content) > 1600 else "")])
+            source_ref = f"; source_ref={project_summary['source_ref']}" if project_summary.get("source_ref") else ""
+            add_group(f"Project summary: {project}{source_ref}", [content[:1600] + ("…" if len(content) > 1600 else "")])
         if user_summary:
             content = user_summary["content"].strip()
-            add_group("User summary", [content[:1600] + ("…" if len(content) > 1600 else "")])
+            source_ref = f"; source_ref={user_summary['source_ref']}" if user_summary.get("source_ref") else ""
+            add_group(f"User summary{source_ref}", [content[:1600] + ("…" if len(content) > 1600 else "")])
 
         memories = memory_override if memory_override is not None else self.retrieve(query, project=project, limit=limit)
         memory_entries = []
@@ -300,9 +302,12 @@ class MemoryEngine:
                 text = text[:1197] + "..."
             score = memory.get("hybrid_score", memory.get("retrieval_score"))
             score_label = f"; score={score:.3f}" if isinstance(score, (int, float)) else ""
+            source_ref = str(memory.get("source_ref") or "")[:100]
+            source_label = f"; ref={source_ref}" if source_ref else ""
             memory_entries.append(
-                f"- (memory #{memory['id']}; source={memory['source_type']}; "
-                f"confidence={memory['confidence']:.2f}; project={memory['project']}{score_label}) {text}"
+                f"- (memory #{memory['id']}; category={memory['category']}; source={memory['source_type']}"
+                f"{source_label}; confidence={memory['confidence']:.2f}; importance={memory['importance']}"
+                f"; project={memory['project']}{score_label}) {text}"
             )
         add_group("Relevant saved memories", memory_entries)
 
