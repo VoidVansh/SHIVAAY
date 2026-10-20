@@ -48,6 +48,18 @@ class ChatTests(unittest.TestCase):
         self.assertIn("meaning-based memory retrieval", backend.calls[0][0]["content"])
         self.assertIn("similarity=0.910", backend.calls[0][0]["content"])
 
+    def test_existing_conversation_can_be_resumed_with_recent_history(self):
+        self.engine.archive_conversation("resume-me", [
+            {"role": "user", "content": "We chose SQLite."},
+            {"role": "assistant", "content": "Yes, local SQLite."},
+        ], project="SHIVAAY")
+        backend = FakeBackend()
+        chat = MemoryChat(self.engine, backend, project="SHIVAAY", conversation_id="resume-me")
+        self.assertEqual(len(chat.history), 2)
+        chat.send("What did we choose?")
+        self.assertIn("We chose SQLite.", backend.calls[0][1]["content"])
+        self.assertEqual(len(self.engine.get_conversation_messages("resume-me")), 4)
+
     def test_periodic_summary_is_saved_and_reused(self):
         class SummaryBackend:
             def __init__(self):

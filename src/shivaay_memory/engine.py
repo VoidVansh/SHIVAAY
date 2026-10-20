@@ -201,6 +201,18 @@ class MemoryEngine:
                 count += 1
         return count
 
+    def get_conversation_messages(
+        self, conversation_id: str, *, limit: int = 24
+    ) -> list[dict[str, Any]]:
+        """Load the most recent archived messages for a conversation, in chronological order."""
+        rows = self.store.execute(
+            "SELECT conversation_id, project, role, content, created_at FROM conversations "
+            "WHERE conversation_id=? ORDER BY id DESC LIMIT ?",
+            (conversation_id, max(1, min(int(limit), 500))),
+        )
+        rows.reverse()
+        return rows
+
     def search_conversations(
         self, query: str, *, project: str | None = None, limit: int = 10
     ) -> list[dict[str, Any]]:

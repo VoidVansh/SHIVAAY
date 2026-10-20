@@ -80,7 +80,7 @@ class MemoryChat:
         self._turn_count = 0
         self._summary_window: list[dict[str, str]] = []
         self.last_summary_error: str | None = None
-        self.history: list[dict[str, str]] = []
+        self.history: list[dict[str, str]] = [\n            {"role": row["role"], "content": row["content"]}\n            for row in engine.get_conversation_messages(self.conversation_id, limit=self.history_limit)\n            if row["role"] in {"user", "assistant"}\n        ]
 
     def send(self, user_message: str) -> tuple[str, TurnResult]:
         text = user_message.strip()
