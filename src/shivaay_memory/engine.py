@@ -201,18 +201,6 @@ class MemoryEngine:
                 count += 1
         return count
 
-    def get_conversation_messages(
-        self, conversation_id: str, *, limit: int = 24
-    ) -> list[dict[str, Any]]:
-        """Load the most recent archived messages for a conversation, in chronological order."""
-        rows = self.store.execute(
-            "SELECT conversation_id, project, role, content, created_at FROM conversations "
-            "WHERE conversation_id=? ORDER BY id DESC LIMIT ?",
-            (conversation_id, max(1, min(int(limit), 500))),
-        )
-        rows.reverse()
-        return rows
-
     def search_conversations(
         self, query: str, *, project: str | None = None, limit: int = 10
     ) -> list[dict[str, Any]]:
@@ -269,15 +257,16 @@ class MemoryEngine:
         chunks: list[str] = []
         used = 0
 
-        def add_group(title: str, entries: list[str]) -> None:
+        def add_group(title: str, entries: list[str]) -> int:
             nonlocal used
             if not entries or used >= budget:
-                return
+                return 0
             heading = f"[{title}]"
             if used + len(heading) + 1 > budget:
-                return
+                return 0
             chunks.append(heading)
             used += len(heading) + 1
+            added = 0
             for entry in entries:
                 if used >= budget:
                     break
@@ -292,8 +281,10 @@ class MemoryEngine:
                         break
                 chunks.append(entry)
                 used += len(entry) + 1
+                added += 1
                 if used >= budget:
                     break
+            return added
 
         project_summary = self.get_summary("project", project) if project else None
         user_summary = self.get_summary("user", "default")
@@ -309,7 +300,7 @@ class MemoryEngine:
         memories = memory_override if memory_override is not None else self.retrieve(query, project=project, limit=limit)
         memory_entries = []
         for memory in memories[:max(1, min(limit, 50))]:
-            text = memory["text"].replace("\\n", " ").strip()
+            text = memory["text"].replace("\n", " ").strip()
             if len(text) > 1200:
                 text = text[:1197] + "..."
             score = memory.get("hybrid_score", memory.get("retrieval_score"))
@@ -321,7 +312,7 @@ class MemoryEngine:
                 f"{source_label}; confidence={memory['confidence']:.2f}; importance={memory['importance']}"
                 f"; project={memory['project']}{score_label}) {text}"
             )
-        add_group("Relevant saved memories", memory_entries)
+        included_memories = add_group("Relevant saved memories", memory_entries)\n        self.mark_accessed([memory["id"] for memory in memories[:included_memories]])
 
         conversations = self.search_conversations(query, project=project, limit=min(limit, 5))
         conversation_entries = []
@@ -334,7 +325,24 @@ class MemoryEngine:
             )
         add_group("Relevant conversation excerpts — verify against full conversation if needed",
                   conversation_entries)
-        return "\\n".join(chunks) if chunks else "[No relevant saved context found.]"
+        return "\n".join(chunks) if chunks else "[No relevant saved context found.]"
+
+    def mark_accessed(self, memory_ids: list[int]) -> int:
+        """Record memories actually shown in a built context, without changing their content."""
+        ids = list(dict.fromkeys(int(memory_id) for memory_id in memory_ids))
+        if not ids:
+            return 0
+        now_sql = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+        with self.store.connect() as conn:
+            changed = 0
+            for memory_id in ids:
+                cur = conn.execute(
+                    f"UPDATE memories SET access_count=access_count+1, last_accessed_at={now_sql} "
+                    "WHERE id=? AND status='active'",
+                    (memory_id,),
+                )
+                changed += cur.rowcount
+            return changed
 
     def delete_memory(self, memory_id: int) -> bool:
         """Explicit hard deletion; caller should confirm with the user first."""

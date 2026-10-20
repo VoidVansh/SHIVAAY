@@ -59,6 +59,20 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertIn("category=decision", context)
         self.assertIn("importance=5", context)
 
+    def test_context_tracks_only_memories_actually_included(self):
+        memory_id = self.engine.add_memory("A relevant memory is visible.", project="SHIVAAY")
+        context = self.engine.build_context("relevant memory", project="SHIVAAY")
+        row = self.engine.get_memory(memory_id)
+        self.assertIn("Relevant saved memories", context)
+        self.assertEqual(row["access_count"], 1)
+        self.assertIsNotNone(row["last_accessed_at"])
+
+    def test_context_uses_real_newlines(self):
+        self.engine.add_memory("Line one\nLine two", project="SHIVAAY")
+        context = self.engine.build_context("line one", project="SHIVAAY")
+        self.assertIn("\n", context)
+        self.assertNotIn("\\n", context)
+
     def test_context_respects_character_budget(self):
         self.engine.add_memory("Important local memory " + ("details " * 200), project="SHIVAAY", importance=5)
         self.engine.save_summary("project", "SHIVAAY", "Project summary " + ("context " * 500))
