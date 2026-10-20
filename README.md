@@ -73,6 +73,8 @@ shivaay-memory reject-candidate --id 2
 shivaay-memory memory-policy
 shivaay-memory maintenance-scan --project SHIVAAY
 shivaay-memory maintenance --status pending
+shivaay-memory check-db
+shivaay-memory backup --file ~/shivaay-backups/memory.sqlite3
 ```
 
 To archive an existing conversation from a JSON file, use an array of `{role, content}` objects and run `shivaay-memory archive --conversation-id chat-001 --file conversation.json --project SHIVAAY`. To propose candidates from that file, use `shivaay-memory extract --file conversation.json --project SHIVAAY --source-ref chat-001`.
@@ -91,4 +93,4 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 python -m unittest discover -s tests -v
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), and [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), and [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md), and [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).

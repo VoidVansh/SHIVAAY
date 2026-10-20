@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .engine import MemoryEngine
@@ -107,6 +108,14 @@ def _parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _parser().parse_args()
+    if args.command == "restore":
+        destination = args.db or os.environ.get("SHIVAAY_MEMORY_DB") or str(DEFAULT_DB)
+        try:
+            print(json.dumps(restore_database(args.file, destination, overwrite=args.overwrite), indent=2))
+        except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
+        return
     engine = MemoryEngine(args.db)
     queue = CandidateQueue(engine)
     maintenance = MemoryMaintenance(engine)
