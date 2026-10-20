@@ -48,6 +48,41 @@ class ChatTests(unittest.TestCase):
         self.assertIn("meaning-based memory retrieval", backend.calls[0][0]["content"])
         self.assertIn("similarity=0.910", backend.calls[0][0]["content"])
 
+    def test_periodic_summary_is_saved_and_reused(self):
+        class SummaryBackend:
+            def __init__(self):
+                self.calls = []
+            def reply(self, messages):
+                self.calls.append(messages)
+                if "Summarize conversation data faithfully" in messages[0]["content"]:
+                    return "User is building SHIVAAY; next step is improve memory."
+                return "Ordinary reply"
+        backend = SummaryBackend()
+        chat = MemoryChat(self.engine, backend, project="SHIVAAY",
+                          conversation_id="summary-test", summary_interval=2)
+        chat.send("I am building SHIVAAY.")
+        chat.send("Next, improve memory.")
+        saved = self.engine.get_summary("conversation", "summary-test")
+        self.assertIn("next step", saved["content"])
+        chat.send("What should we do next?")
+        self.assertIn("Current conversation summary", backend.calls[-1][0]["content"])
+        self.assertIn("next step is improve memory", backend.calls[-1][0]["content"])
+
+    def test_summary_failure_does_not_fail_successful_chat_turn(self):
+        class FlakyBackend:
+            def __init__(self):
+                self.calls = 0
+            def reply(self, messages):
+                self.calls += 1
+                if "Summarize conversation data faithfully" in messages[0]["content"]:
+                    raise RuntimeError("summary unavailable")
+                return "Still answered"
+        chat = MemoryChat(self.engine, FlakyBackend(), summary_interval=1)
+        answer, _ = chat.send("Please answer normally.")
+        self.assertEqual(answer, "Still answered")
+        self.assertIsNotNone(chat.last_summary_error)
+        self.assertEqual(len(self.engine.search_conversations("normally")), 1)
+
     def test_rule_extractor_only_queues_candidates(self):
         backend = FakeBackend()
         chat = MemoryChat(self.engine, backend, extractor=RuleBasedExtractor())

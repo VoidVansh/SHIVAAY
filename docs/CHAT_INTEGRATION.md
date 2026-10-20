@@ -37,3 +37,10 @@ Example:
 - The caller decides which messages are passed to the model. This library does not run inference.
 - Candidate generation and durable memory storage are separate steps; approval remains explicit.
 - Use a local inference backend for strict local processing. Cloud model calls send prompt data to that provider.
+
+
+## Rolling conversation summaries
+
+The interactive `MemoryChat` runtime periodically compacts conversation turns into a `conversation` summary. The default CLI refresh interval is 10 user turns; pass `--summary-every 0` to disable it. A summary is included in later prompts as a labelled continuity aid, while the full messages remain in the local archive. Summary generation uses the configured chat backend and therefore adds one extra inference call per interval.
+
+If summary generation fails, the successful user/assistant turn remains archived and the summary window is retained for a later retry. Summaries are fallible model-generated notes, not verified facts; latest explicit user corrections should take precedence.

@@ -20,6 +20,7 @@ def main() -> None:
     parser.add_argument("--semantic", action="store_true", help="Also retrieve memories by meaning using local embeddings")
     parser.add_argument("--embedding-model", default="nomic-embed-text", help="Embedding model available in local Ollama")
     parser.add_argument("--context-chars", type=int, default=8000, help="Maximum retrieved context characters (500-50000)")
+    parser.add_argument("--summary-every", type=int, default=10, help="Summarize conversation every N turns; use 0 to disable")
     args = parser.parse_args()
 
     try:
@@ -34,7 +35,7 @@ def main() -> None:
             print(f"Indexed {count} memory/memories.")
         chat = MemoryChat(engine, backend, project=args.project,
                           extractor=RuleBasedExtractor() if args.capture_candidates else None,
-                          semantic_index=semantic_index, context_chars=args.context_chars)
+                          semantic_index=semantic_index, context_chars=args.context_chars, summary_interval=args.summary_every)
     except (ValueError, RuntimeError, OSError) as exc:
         print(f"SHIVAAY error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
@@ -55,6 +56,8 @@ def main() -> None:
         try:
             answer, turn = chat.send(user_text)
             print(f"\nSHIVAAY: {answer}")
+            if chat.last_summary_error:
+                print("[Memory note: conversation summary was not refreshed; chat and archive are safe. It will retry later.]")
             if turn.candidate_ids:
                 print(f"[Queued {len(turn.candidate_ids)} memory candidate(s). Review with shivaay-memory candidates.]")
         except (ValueError, RuntimeError) as exc:
