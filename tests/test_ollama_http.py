@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import unittest
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from shivaay_memory.chat import OllamaBackend
+from shivaay_memory.chat import MemoryChat, OllamaBackend
+from shivaay_memory.engine import MemoryEngine
 
 
 class OllamaBackendHTTPTests(unittest.TestCase):
@@ -50,11 +53,29 @@ class OllamaBackendHTTPTests(unittest.TestCase):
         self.assertEqual(content_type, "application/json")
         self.assertEqual(payload, {"model": "test-model", "messages": messages, "stream": False})
 
-    def test_invalid_json_response_is_reported_cleanly(self):
+    def test_malformed_message_shape_is_reported_cleanly(self):
         self.response_body = {"not_message": True}
         backend = OllamaBackend(host=self.host, timeout=2)
         with self.assertRaisesRegex(RuntimeError, "empty or malformed"):
             backend.reply([{"role": "user", "content": "Hello"}])
+
+    def test_full_memory_chat_round_trip_uses_local_http_backend_and_archives_turn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = MemoryEngine(str(Path(tmp) / "memory.sqlite3"))
+            engine.add_memory("SHIVAAY uses local SQLite for persistent memory.",
+                              project="SHIVAAY", importance=5)
+            chat = MemoryChat(engine, OllamaBackend(model="test-model", host=self.host),
+                              project="SHIVAAY", conversation_id="http-integration")
+            answer, turn = chat.send("Which database does SHIVAAY use?")
+            self.assertEqual(answer, "Local reply")
+            self.assertEqual(turn.archived_messages, 2)
+            archived = engine.get_conversation_messages("http-integration")
+            self.assertEqual([row["role"] for row in archived], ["user", "assistant"])
+            sent_messages = self.requests[0][2]["messages"]
+            self.assertEqual(sent_messages[-1], {
+                "role": "user", "content": "Which database does SHIVAAY use?"
+            })
+            self.assertIn("local SQLite", sent_messages[0]["content"])
 
     def test_remote_hosts_are_rejected_before_any_request(self):
         for host in ("https://example.com", "http://192.0.2.10:11434",
