@@ -36,6 +36,26 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(self.engine.get_memory(memory_id)["status"], "active")
         self.assertEqual(self.queue.list(status="approved")[0]["memory_id"], memory_id)
 
+    def test_duplicate_detection_normalizes_case_punctuation_and_whitespace(self):
+        from shivaay_memory.extraction import MemoryCandidate
+
+        first = MemoryCandidate(
+            "I prefer concise explanations.", category="preference",
+            project="SHIVAAY", confidence=0.72, importance=3,
+        )
+        variant = MemoryCandidate(
+            "  I PREFER   concise explanations!!! ", category="preference",
+            project="SHIVAAY", confidence=0.8, importance=4,
+        )
+        ids = self.queue.propose([first], source_ref="chat-one")
+        self.assertEqual(len(ids), 1)
+        self.assertEqual(self.queue.propose([variant], source_ref="chat-two"), [])
+        pending = self.queue.list(status="pending")
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["recurrence_count"], 2)
+        self.assertEqual(pending[0]["confidence"], 0.8)
+        self.assertEqual(pending[0]["importance"], 4)
+
     def test_rejection_and_duplicate_proposal(self):
         candidate = RuleBasedExtractor().extract(
             [{"role": "user", "content": "I plan to build a local-first assistant with persistent memory."}],
