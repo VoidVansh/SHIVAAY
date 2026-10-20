@@ -17,6 +17,7 @@ class OllamaBackendHTTPTests(unittest.TestCase):
         self.requests = []
         self.response_body = {"message": {"content": "  Local reply  "}}
         self.status_code = 200
+        self.raw_response = None
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -24,7 +25,7 @@ class OllamaBackendHTTPTests(unittest.TestCase):
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length)
                 owner.requests.append((self.path, self.headers.get("Content-Type"), json.loads(body)))
-                payload = json.dumps(owner.response_body).encode("utf-8")
+                payload = owner.raw_response if owner.raw_response is not None else json.dumps(owner.response_body).encode("utf-8")
                 self.send_response(owner.status_code)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
@@ -76,6 +77,17 @@ class OllamaBackendHTTPTests(unittest.TestCase):
                 "role": "user", "content": "Which database does SHIVAAY use?"
             })
             self.assertIn("local SQLite", sent_messages[0]["content"])
+
+    def test_invalid_json_and_http_error_are_reported_as_local_backend_failures(self):
+        self.raw_response = b"not-json"
+        backend = OllamaBackend(host=self.host, timeout=2)
+        with self.assertRaisesRegex(RuntimeError, "invalid JSON"):
+            backend.reply([{"role": "user", "content": "Hello"}])
+
+        self.raw_response = None
+        self.status_code = 500
+        with self.assertRaisesRegex(RuntimeError, "Could not reach local Ollama"):
+            backend.reply([{"role": "user", "content": "Hello"}])
 
     def test_remote_hosts_are_rejected_before_any_request(self):
         for host in ("https://example.com", "http://192.0.2.10:11434",
