@@ -8,7 +8,7 @@ A local-first persistent memory engine and chat runtime for SHIVAAY. It stores m
 
 - SQLite memory store, FTS5 search, source/provenance and confidence metadata.
 - Sensitivity gate, correction history, project/user summaries, and conversation archive.
-- Candidate extraction and human review queue; proposals are not auto-approved.
+- Candidate extraction and human review queue with transparent auto-save eligibility/reasons; likely conflicts and sensitive candidates stay pending.
 - Provider-neutral memory-aware chat orchestration and interactive local chat CLI.
 - HTTP-level tests for the Ollama adapter using a temporary loopback server (no model download needed).
 - Optional SQLite-backed semantic index using local Ollama embeddings; no vector database or Python numerical package required.
