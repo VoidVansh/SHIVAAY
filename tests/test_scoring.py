@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -105,3 +106,35 @@ class ScoringTests(unittest.TestCase):
         result = score_candidate(sensitive)
         self.assertEqual(result["sensitivity_risk"], 1.0)
         self.assertFalse(result["auto_save_eligible"])
+
+    def test_existing_candidate_database_is_migrated_additively(self):
+        legacy_path = Path(self.tempdir.name) / "legacy.sqlite3"
+        legacy_engine = MemoryEngine(str(legacy_path))
+        with legacy_engine.store.connect() as conn:
+            conn.execute("""
+                CREATE TABLE memory_candidates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    text TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    project TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT,
+                    confidence REAL NOT NULL,
+                    importance INTEGER NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    memory_id INTEGER,
+                    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+                    reviewed_at TEXT
+                )
+            """)
+            conn.execute("""
+                INSERT INTO memory_candidates
+                (text, category, project, source_type, confidence, importance, reason)
+                VALUES ('I prefer clear examples.', 'preference', 'SHIVAAY',
+                        'user_statement', 0.72, 3, 'legacy candidate')
+            """)
+        migrated = CandidateQueue(legacy_engine).list(status="pending")
+        self.assertEqual(len(migrated), 1)
+        self.assertEqual(migrated[0]["recurrence_count"], 1)
+        self.assertTrue(migrated[0]["last_seen_at"])
