@@ -130,12 +130,20 @@ class CandidateQueue:
                 normalized = re.sub(r"\W+", " ", candidate.text.casefold()).strip()
                 if not normalized:
                     continue
-                exists = conn.execute(
-                    """SELECT id FROM memory_candidates
+                # Compare normalized text in Python so punctuation, repeated spaces,
+                # and case differences don't create duplicate queue rows. Keep this
+                # scoped to the same project and actionable/reviewed candidates.
+                existing_rows = conn.execute(
+                    """SELECT id, text FROM memory_candidates
                        WHERE project=? AND status IN ('pending','approved')
-                       AND lower(text)=lower(?) LIMIT 1""",
-                    (candidate.project, candidate.text),
-                ).fetchone()
+                       ORDER BY id""",
+                    (candidate.project,),
+                ).fetchall()
+                exists = next(
+                    (row for row in existing_rows
+                     if re.sub(r"\\W+", " ", row["text"].casefold()).strip() == normalized),
+                    None,
+                )
                 if exists:
                     # Repeated exact mentions are useful evidence of durability.
                     # Keep the same review item; never create duplicate memories.
