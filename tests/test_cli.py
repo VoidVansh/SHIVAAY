@@ -46,7 +46,7 @@ class CliTests(unittest.TestCase):
     def test_doctor_reports_integrity_and_policy(self):
         payload = json.loads(self.run_cli("doctor"))
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["integrity"]["integrity"], "ok")
+        self.assertEqual(payload["integrity"]["integrity"], ["ok"])
         self.assertEqual(payload["candidate_policy"]["auto_save_enabled"], 0)
 
 
