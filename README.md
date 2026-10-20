@@ -90,7 +90,7 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 - **Memory is not model training.** It retrieves saved context and supplies it to the model at inference time.
 - Extraction is conservative. User-stated details and model inferences must remain distinguishable; inferences should not be presented as confirmed facts.
 - Sensitive details are gated, but avoid putting credentials or secrets into conversation archives in the first place.
-- Semantic similarity and candidate scores are heuristic signals, not proof that a memory is true. Maintenance only proposes possible duplicates/conflicts; it never changes memories during scans. Candidate auto-save is off by default and must be explicitly enabled with thresholds.
+- Semantic similarity and candidate scores are heuristic signals, not proof that a memory is true. Maintenance only proposes possible duplicates/conflicts; it never changes memories during scans. Candidate auto-save is off by default and must be explicitly enabled with thresholds; likely negation-based conflicts with active memories remain in review.
 - This is a working foundation, not yet a finished JARVIS-style desktop HUD. Hybrid semantic retrieval is available in chat when the `--semantic` option is enabled; the default remains lightweight lexical-only retrieval.
 
 ## Tests
