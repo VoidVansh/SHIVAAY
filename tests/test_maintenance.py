@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from shivaay_memory import MemoryEngine
-from shivaay_memory.maintenance import MemoryMaintenance
+from shivaay_memory.maintenance import MemoryMaintenance, possible_update_text
 
 
 class MemoryMaintenanceTests(unittest.TestCase):
@@ -43,6 +43,20 @@ class MemoryMaintenanceTests(unittest.TestCase):
         self.maintenance.dismiss(first[0]["id"])
         self.assertEqual(self.maintenance.list(status="pending"), [])
         self.assertEqual(self.maintenance.list(status="dismissed")[0]["status"], "dismissed")
+
+    def test_explicit_update_cue_requires_same_claim_family_and_changed_value(self):
+        self.assertTrue(possible_update_text(
+            "Actually, I prefer detailed explanations.",
+            "I prefer concise explanations.",
+        ))
+        self.assertFalse(possible_update_text(
+            "I prefer detailed explanations.",
+            "I prefer concise explanations.",
+        ))
+        self.assertFalse(possible_update_text(
+            "Actually, I like dogs.",
+            "I prefer concise explanations.",
+        ))
 
     def test_apply_only_pending_suggestions(self):
         with self.assertRaises(KeyError):
