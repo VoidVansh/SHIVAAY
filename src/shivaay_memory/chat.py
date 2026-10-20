@@ -5,10 +5,12 @@ replaceable, so the memory layer remains independent of any model vendor.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import urllib.error
 import urllib.request
 import uuid
+from urllib.parse import urlsplit
 from typing import Protocol
 
 from .engine import MemoryEngine
@@ -33,8 +35,16 @@ class OllamaBackend:
         self.timeout = timeout
         if not self.model:
             raise ValueError("Model name cannot be empty.")
-        if not self.host.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]")):
-            raise ValueError("For privacy, Ollama host must be localhost/loopback. Remote hosts are not accepted by this backend.")
+        parsed = urlsplit(self.host)
+        hostname = (parsed.hostname or "").casefold()
+        is_loopback = hostname == "localhost"
+        if not is_loopback:
+            try:
+                is_loopback = ipaddress.ip_address(hostname).is_loopback
+            except ValueError:
+                is_loopback = False
+        if parsed.scheme != "http" or not is_loopback or parsed.username or parsed.password:
+            raise ValueError("For privacy, Ollama host must be an HTTP loopback URL (localhost, 127.0.0.1, or ::1). Remote hosts are not accepted.")
 
     def reply(self, messages: list[dict[str, str]]) -> str:
         payload = json.dumps({"model": self.model, "messages": messages, "stream": False}).encode("utf-8")
