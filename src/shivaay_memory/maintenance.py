@@ -45,15 +45,15 @@ def possible_conflict_text(a: str, b: str) -> bool:
 
 
 _CLAIM_FAMILIES = (
-    re.compile(r"\\b(i\\s+prefer)\\s+(.+)", re.I),
-    re.compile(r"\\b(i\\s+(?:like|love|hate|want|need))\\s+(.+)", re.I),
-    re.compile(r"\\b(i\\s+(?:plan to|intend to|use|study))\\s+(.+)", re.I),
-    re.compile(r"\\b(my\\s+(?:goal|project|plan)\\s+is)\\s+(.+)", re.I),
-    re.compile(r"\\b(i\\s+am\\s+building)\\s+(.+)", re.I),
+    re.compile(r"\b(i\s+prefer)\s+(.+)", re.I),
+    re.compile(r"\b(i\s+(?:like|love|hate|want|need))\s+(.+)", re.I),
+    re.compile(r"\b(i\s+(?:plan to|intend to|use|study))\s+(.+)", re.I),
+    re.compile(r"\b(my\s+(?:goal|project|plan)\s+is)\s+(.+)", re.I),
+    re.compile(r"\b(i\s+am\s+building)\s+(.+)", re.I),
 )
 _EXPLICIT_UPDATE_CUE = re.compile(
-    r"\\b(?:actually|instead|from now on|no longer|not anymore|rather than|"
-    r"correction|update:|i changed my mind|i now prefer|i now want)\\b",
+    r"\b(?:actually|instead|from now on|no longer|not anymore|rather than|"
+    r"correction|update:|i changed my mind|i now prefer|i now want)\b",
     re.I,
 )
 
@@ -70,8 +70,8 @@ def possible_update_text(new_text: str, existing_text: str) -> bool:
         for pattern in _CLAIM_FAMILIES:
             match = pattern.search(text)
             if match:
-                predicate = re.sub(r"\\s+", " ", match.group(1).casefold()).strip()
-                value = re.split(r"[.!?;\\n]", match.group(2), maxsplit=1)[0]
+                predicate = re.sub(r"\s+", " ", match.group(1).casefold()).strip()
+                value = re.split(r"[.!?;\n]", match.group(2), maxsplit=1)[0]
                 value = " ".join(sorted(_tokens(value)))
                 return predicate, value
         return None
