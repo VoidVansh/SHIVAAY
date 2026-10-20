@@ -7,7 +7,7 @@ Each candidate receives transparent heuristic signals:
 - **Sensitivity risk:** obvious sensitive markers trigger a hard exclusion from automatic saving.
 - **Overall score:** weighted heuristic (40% durability, 35% usefulness, 25% confidence).
 
-Scores help prioritize review; they are not calibrated probabilities. They can be wrong. Sensitive-memory checks in the memory engine remain authoritative.
+Scores help prioritize review; they are not calibrated probabilities. They can be wrong. The candidate queue also includes an `auto_save_decision` and `auto_save_reason` for each item, explaining whether it is in review, blocked by a safeguard, already reviewed, or eligible under the current policy. Changing the policy does not retroactively approve old queued items. Sensitive-memory checks in the memory engine remain authoritative.
 
 Automatic saving is **off by default**. Inspect the current policy:
 
