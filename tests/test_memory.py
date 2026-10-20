@@ -59,6 +59,26 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertIn("category=decision", context)
         self.assertIn("importance=5", context)
 
+    def test_delete_cleans_references_and_preserves_other_history(self):
+        original = self.engine.add_memory("The original fact.", project="SHIVAAY")
+        corrected = self.engine.correct_memory(original, "The corrected fact.", reason="test")
+        with self.engine.store.connect() as conn:
+            conn.execute("""CREATE TABLE memory_embeddings (
+                memory_id INTEGER PRIMARY KEY, model TEXT, dimensions INTEGER,
+                vector_json TEXT, updated_at TEXT)""")
+            conn.execute("INSERT INTO memory_embeddings VALUES (?, 'fake', 2, '[1,0]', 'now')", (corrected,))
+            conn.execute("""CREATE TABLE maintenance_suggestions (
+                id INTEGER PRIMARY KEY, memory_id INTEGER NOT NULL, compared_memory_id INTEGER,
+                kind TEXT, reason TEXT, status TEXT, applied_memory_id INTEGER)""")
+            conn.execute("INSERT INTO maintenance_suggestions VALUES (1, ?, ?, 'possible_conflict', 'test', 'pending', NULL)",
+                         (original, corrected))
+        self.assertTrue(self.engine.delete_memory(corrected))
+        self.assertIsNone(self.engine.get_memory(corrected))
+        self.assertEqual(self.engine.get_memory(original)["superseded_by"], None)
+        self.assertEqual(self.engine.store.execute("SELECT COUNT(*) AS n FROM memory_embeddings")[0]["n"], 0)
+        self.assertEqual(self.engine.store.execute("SELECT COUNT(*) AS n FROM maintenance_suggestions")[0]["n"], 0)
+        self.assertFalse(self.engine.delete_memory(corrected))
+
     def test_context_tracks_only_memories_actually_included(self):
         memory_id = self.engine.add_memory("A relevant memory is visible.", project="SHIVAAY")
         context = self.engine.build_context("relevant memory", project="SHIVAAY")

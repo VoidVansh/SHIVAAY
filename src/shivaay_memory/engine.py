@@ -364,8 +364,33 @@ class MemoryEngine:
             return changed
 
     def delete_memory(self, memory_id: int) -> bool:
-        """Explicit hard deletion; caller should confirm with the user first."""
+        """Hard-delete a memory and clean derived references, preserving other records.
+
+        Conversation archives are intentionally untouched; they are a separate
+        source of data and must be deleted explicitly if the user wants them gone.
+        """
         with self.store.connect() as conn:
+            exists = conn.execute("SELECT 1 FROM memories WHERE id=?", (memory_id,)).fetchone()
+            if not exists:
+                return False
+            tables = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            # Suggestions reference memories with restrictive foreign keys; remove
+            # those suggestions before deleting the referenced record.
+            if "maintenance_suggestions" in tables:
+                conn.execute(
+                    """DELETE FROM maintenance_suggestions
+                       WHERE memory_id=? OR compared_memory_id=? OR applied_memory_id=?""",
+                    (memory_id, memory_id, memory_id),
+                )
+            if "memory_embeddings" in tables:
+                conn.execute("DELETE FROM memory_embeddings WHERE memory_id=?", (memory_id,))
+            if "memory_candidates" in tables:
+                # Keep the candidate audit trail but remove its dangling memory pointer.
+                conn.execute("UPDATE memory_candidates SET memory_id=NULL WHERE memory_id=?", (memory_id,))
+            # A newer memory may point to this one as its superseded replacement.
+            conn.execute("UPDATE memories SET superseded_by=NULL WHERE superseded_by=?", (memory_id,))
             cur = conn.execute("DELETE FROM memories WHERE id=?", (memory_id,))
             return cur.rowcount > 0
 
