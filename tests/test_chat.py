@@ -46,6 +46,10 @@ class ChatTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             OllamaBackend(host="https://example.com")
 
+    def test_lookalike_remote_host_rejected(self):
+        with self.assertRaises(ValueError):
+            OllamaBackend(host="http://127.0.0.1.evil.example:11434")
+
     def test_empty_user_message_rejected(self):
         chat = MemoryChat(self.engine, FakeBackend())
         with self.assertRaises(ValueError):
