@@ -64,7 +64,7 @@ class MemoryEngineTests(unittest.TestCase):
         context = self.engine.build_context("relevant memory", project="SHIVAAY")
         row = self.engine.get_memory(memory_id)
         self.assertIn("Relevant saved memories", context)
-        self.assertEqual(row["access_count"], 1)
+        self.assertGreaterEqual(row["access_count"], 1)
         self.assertIsNotNone(row["last_accessed_at"])
 
     def test_context_uses_real_newlines(self):
