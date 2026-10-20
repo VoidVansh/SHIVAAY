@@ -144,7 +144,7 @@ class CandidateQueue:
                 ).fetchall()
                 exists = next(
                     (row for row in existing_rows
-                     if re.sub(r"\\W+", " ", row["text"].casefold()).strip() == normalized),
+                     if re.sub(r"\W+", " ", row["text"].casefold()).strip() == normalized),
                     None,
                 )
                 if exists:
