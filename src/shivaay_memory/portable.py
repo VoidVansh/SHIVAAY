@@ -125,10 +125,14 @@ def import_json(database: str | Path, source: str | Path, *, allow_sensitive: bo
                     "source_ref": None, "confidence": 1.0, "importance": 3, "sensitivity": "normal",
                     "status": "active", "created_at": None, "updated_at": None,
                     "last_accessed_at": None, "access_count": 0, "tags": "", "note": "",
-                }[field]
+                }.get(field)
                 values.append(row.get(field, default))
             cols = ", ".join(columns)
-            placeholders = ", ".join("?" for _ in columns)
+            placeholders = ", ".join(
+                "COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+                if field in {"created_at", "updated_at"} else "?"
+                for field in columns
+            )
             cur = conn.execute(f"INSERT INTO memories ({cols}) VALUES ({placeholders})", values)
             old_id = row.get("id")
             if isinstance(old_id, int):
