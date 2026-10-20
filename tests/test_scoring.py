@@ -38,6 +38,17 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(self.engine.stats()["memories"], 0)
         self.assertEqual(self.queue.get_policy()["auto_save_enabled"], 0)
 
+    def test_auto_save_keeps_sensitive_candidates_pending(self):
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        candidate = MemoryCandidate(
+            "My API key is a private credential.", category="preference",
+            project="SHIVAAY", confidence=0.99, importance=5,
+        )
+        ids = self.queue.propose([candidate])
+        rows = {row["id"]: row for row in self.queue.list(status="all")}
+        self.assertEqual(rows[ids[0]]["status"], "pending")
+        self.assertEqual(self.engine.stats()["memories"], 0)
+
     def test_auto_save_keeps_possible_conflicts_pending_for_review(self):
         self.engine.add_memory("I prefer concise explanations.", category="preference",
                                project="SHIVAAY", confidence=1.0, importance=5)
