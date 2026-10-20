@@ -61,6 +61,9 @@ def _parser() -> argparse.ArgumentParser:
     search.add_argument("--project")
     search.add_argument("--limit", type=int, default=10)
 
+    show = sub.add_parser("show", help="Inspect one memory and its provenance")
+    show.add_argument("--id", required=True, type=int)
+
     listing = sub.add_parser("list", help="List saved memories")
     listing.add_argument("--project")
     listing.add_argument("--include-superseded", action="store_true")
@@ -124,6 +127,7 @@ def _parser() -> argparse.ArgumentParser:
     policy.add_argument("--min-score", type=float)
 
     sub.add_parser("stats", help="Show local memory counts")
+    sub.add_parser("doctor", help="Check local database health and memory runtime configuration")
     delete_conversation = sub.add_parser("delete-conversation", help="Delete an archived conversation and its summary")
     delete_conversation.add_argument("--id", required=True, help="Conversation ID")
     delete_conversation.add_argument("--include-linked-memories", action="store_true",
@@ -156,7 +160,7 @@ def main() -> None:
     except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
-    engine = MemoryEngine(args.db)
+    engine = MemoryEngine(database)
     queue = CandidateQueue(engine)
     maintenance = MemoryMaintenance(engine)
     try:
@@ -177,6 +181,11 @@ def main() -> None:
             print(f"Saved memory #{mid}")
         elif args.command == "search":
             print(json.dumps(engine.search(args.query, project=args.project, limit=args.limit), indent=2, ensure_ascii=False))
+        elif args.command == "show":
+            record = engine.get_memory(args.id)
+            if record is None:
+                raise KeyError(f"No memory with ID {args.id}.")
+            print(json.dumps(record, indent=2, ensure_ascii=False))
         elif args.command == "list":
             print(json.dumps(engine.list_memories(project=args.project, include_superseded=args.include_superseded, limit=args.limit), indent=2, ensure_ascii=False))
         elif args.command == "correct":
@@ -226,6 +235,23 @@ def main() -> None:
                     min_score=args.min_score,
                 )
                 print(json.dumps(updated, indent=2))
+        elif args.command == "doctor":
+            integrity = check_database(engine.store.db_path)
+            report = {
+                "ok": integrity.get("ok", False),
+                "database": str(engine.store.db_path),
+                "integrity": integrity,
+                "memory_stats": engine.stats(),
+                "candidate_policy": queue.get_policy(),
+                "notes": [
+                    "Memory CLI uses the selected local SQLite database.",
+                    "Auto-save is opt-in; inspect candidate policy before enabling it.",
+                    "Chat inference is local only when using the Ollama loopback adapter; no cloud fallback is configured.",
+                ],
+            }
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+            if not report["ok"]:
+                raise RuntimeError("Database integrity check failed.")
         elif args.command == "stats":
             stats = {"database": str(engine.store.db_path), **engine.stats()}
             stats["pending_candidates"] = len(queue.list(status="pending", limit=200))
