@@ -101,7 +101,7 @@ class ScoringTests(unittest.TestCase):
                "confidence": 0.8, "importance": 4, "recurrence_count": 1}
         repeated = {**one, "recurrence_count": 5}
         self.assertGreater(score_candidate(repeated)["score"], score_candidate(one)["score"])
-        sensitive = {**repeated, "text": "My private credential is stored here", "confidence": 1.0}
+        sensitive = {**repeated, "text": "My API key is private", "confidence": 1.0}
         result = score_candidate(sensitive)
         self.assertEqual(result["sensitivity_risk"], 1.0)
         self.assertFalse(result["auto_save_eligible"])
