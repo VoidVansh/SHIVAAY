@@ -82,3 +82,26 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(rows[ids[0]]["status"], "approved")
         self.assertEqual(rows[ids[1]]["status"], "pending")
         self.assertEqual(self.engine.stats()["memories"], 1)
+
+    def test_repeated_candidate_increments_recurrence_without_duplicate_row(self):
+        candidate = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                    project="SHIVAAY", confidence=0.72, importance=3)
+        first_ids = self.queue.propose([candidate], source_ref="chat-one")
+        second_ids = self.queue.propose([candidate], source_ref="chat-two")
+        self.assertEqual(len(first_ids), 1)
+        self.assertEqual(second_ids, [])
+        rows = self.queue.list(status="pending")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["recurrence_count"], 2)
+        self.assertEqual(rows[0]["score_recurrence_count"], 2)
+        self.assertGreaterEqual(rows[0]["score_recurrence"], 0.6)
+
+    def test_recurrence_improves_score_but_cannot_override_sensitive_gate(self):
+        one = {"text": "I prefer concise explanations.", "category": "preference",
+               "confidence": 0.8, "importance": 4, "recurrence_count": 1}
+        repeated = {**one, "recurrence_count": 5}
+        self.assertGreater(score_candidate(repeated)["score"], score_candidate(one)["score"])
+        sensitive = {**repeated, "text": "My private credential is stored here", "confidence": 1.0}
+        result = score_candidate(sensitive)
+        self.assertEqual(result["sensitivity_risk"], 1.0)
+        self.assertFalse(result["auto_save_eligible"])
