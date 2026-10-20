@@ -242,7 +242,7 @@ class MemoryEngine:
         )
         return rows[0] if rows else None
 
-    def build_context(self, query: str, *, project: str | None = None, limit: int = 8) -> str:
+    def build_context(self, query: str, *, project: str | None = None, limit: int = 8, memory_override: list[dict[str, Any]] | None = None) -> str:
         """Create a compact, source-labelled context block for a model prompt."""
         chunks: list[str] = []
         summary = self.get_summary("project", project) if project else None
@@ -251,7 +251,7 @@ class MemoryEngine:
         user_summary = self.get_summary("user", "default")
         if user_summary:
             chunks.append(f"[User summary]\n{user_summary['content']}")
-        memories = self.retrieve(query, project=project, limit=limit)
+        memories = memory_override if memory_override is not None else self.retrieve(query, project=project, limit=limit)
         if memories:
             chunks.append("[Relevant saved memories]")
             for m in memories:

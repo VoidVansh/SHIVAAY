@@ -58,7 +58,7 @@ shivaay-semantic search "make the app work without internet" --project SHIVAAY
 shivaay-semantic clean
 ```
 
-The initial indexing run embeds each active memory and may take time. Re-index after adding or correcting memories. Semantic search is optional; enable it in the interactive chat with `--semantic`. It indexes current active memories at startup, so re-run `shivaay-semantic index` after approving or correcting memories. See [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md).
+The initial indexing run embeds each active memory and may take time. Re-index after adding or correcting memories. Semantic search is optional; enable it in the interactive chat with `--semantic`. When enabled, chat fuses lexical and semantic rankings and avoids repeating the same memory in two context blocks. It indexes current active memories at startup, so re-run `shivaay-semantic index` after approving or correcting memories. See [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md).
 
 ## Memory tools
 
@@ -83,7 +83,7 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 - Extraction is conservative. User-stated details and model inferences must remain distinguishable; inferences should not be presented as confirmed facts.
 - Sensitive details are gated, but avoid putting credentials or secrets into conversation archives in the first place.
 - Semantic similarity and candidate scores are heuristic signals, not proof that a memory is true. Maintenance only proposes possible duplicates/conflicts; it never changes memories during scans. Candidate auto-save is off by default and must be explicitly enabled with thresholds.
-- This is a working foundation, not yet a finished JARVIS-style desktop HUD. Semantic search is implemented as an optional API/CLI and is not yet wired into default chat.
+- This is a working foundation, not yet a finished JARVIS-style desktop HUD. Hybrid semantic retrieval is available in chat when the `--semantic` option is enabled; the default remains lightweight lexical-only retrieval.
 
 ## Tests
 

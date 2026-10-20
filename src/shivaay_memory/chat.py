@@ -81,7 +81,14 @@ class MemoryChat:
         if not text:
             raise ValueError("Message cannot be empty.")
         memory_context = self.session.context_for(text, project=self.project, limit=8)
-        if self.semantic_index is not None:
+        if self.semantic_index is not None and hasattr(self.semantic_index, "hybrid_search"):
+            # Real local index fuses lexical + semantic ranks, deduplicating by memory ID.
+            hybrid_hits = self.semantic_index.hybrid_search(text, project=self.project, limit=8)
+            memory_context = self.session.context_for(
+                text, project=self.project, limit=8, memory_override=hybrid_hits
+            )
+        elif self.semantic_index is not None:
+            # Compatibility path for simple custom adapters that only implement search().
             semantic_hits = self.semantic_index.search(text, project=self.project, limit=4)
             if semantic_hits:
                 block = ["[Semantically related saved memories — similarity is a relevance signal, not proof]"]

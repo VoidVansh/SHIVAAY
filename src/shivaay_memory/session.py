@@ -35,10 +35,11 @@ class MemorySession:
         self.queue = queue or CandidateQueue(engine)
 
     def context_for(
-        self, user_message: str, *, project: str = "general", limit: int = 8
+        self, user_message: str, *, project: str = "general", limit: int = 8,
+        memory_override: list[dict] | None = None,
     ) -> str:
         """Return source-labelled memory context to add to the model prompt."""
-        return self.engine.build_context(user_message, project=project, limit=limit)
+        return self.engine.build_context(user_message, project=project, limit=limit, memory_override=memory_override)
 
     def finish_turn(
         self,

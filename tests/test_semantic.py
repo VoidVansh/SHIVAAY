@@ -40,6 +40,16 @@ class SemanticTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in results], [first])
         self.assertGreater(results[0]["semantic_score"], 0.9)
 
+    def test_hybrid_search_fuses_lexical_and_semantic_results(self):
+        first = self.engine.add_memory("My computer should work offline", project="SHIVAAY", importance=5)
+        self.engine.add_memory("Chocolate cake recipe", project="cooking")
+        self.index.index_memory(first)
+        results = self.index.hybrid_search("I want the app to work without internet", project="SHIVAAY")
+        self.assertEqual(results[0]["id"], first)
+        self.assertIn("semantic", results[0]["retrieval_sources"])
+        self.assertIn("lexical", results[0]["retrieval_sources"])
+        self.assertGreater(results[0]["hybrid_score"], 0)
+
     def test_remote_embedding_host_rejected(self):
         with self.assertRaises(ValueError):
             OllamaEmbeddingBackend(host="http://127.0.0.1.attacker.invalid:11434")

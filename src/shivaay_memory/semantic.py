@@ -111,6 +111,48 @@ class SemanticMemoryIndex:
             self.index_memory(memory["id"])
         return len(memories)
 
+    def hybrid_search(self, query: str, *, project: str | None = None, limit: int = 8,
+                      lexical_weight: float = 0.55, semantic_weight: float = 0.45) -> list[dict]:
+        """Fuse lexical and embedding rankings using weighted reciprocal-rank fusion.
+
+        BM25 and cosine scores are not directly comparable, so fuse ranks rather
+        than pretending their raw scores share a scale. Memories found by both
+        methods receive evidence from both rankings.
+        """
+        if not 0 <= lexical_weight <= 1 or not 0 <= semantic_weight <= 1:
+            raise ValueError("Hybrid weights must be between 0 and 1.")
+        if lexical_weight + semantic_weight == 0:
+            raise ValueError("At least one hybrid weight must be positive.")
+        lexical = self.engine.retrieve(query, project=project, limit=max(20, limit * 3))
+        semantic = self.search(query, project=project, limit=max(20, limit * 3))
+        fused: dict[int, dict] = {}
+        for rank, row in enumerate(lexical, start=1):
+            item = dict(row)
+            item["lexical_rank"] = rank
+            item["hybrid_score"] = lexical_weight / (rank + 1)
+            item["retrieval_sources"] = ["lexical"]
+            fused[item["id"]] = item
+        for rank, row in enumerate(semantic, start=1):
+            memory_id = row["id"]
+            if memory_id in fused:
+                item = fused[memory_id]
+                item["hybrid_score"] += semantic_weight / (rank + 1)
+                item["semantic_rank"] = rank
+                item["semantic_score"] = row.get("semantic_score")
+                item["retrieval_sources"].append("semantic")
+            else:
+                item = dict(row)
+                item["semantic_rank"] = rank
+                item["hybrid_score"] = semantic_weight / (rank + 1)
+                item["retrieval_sources"] = ["semantic"]
+                fused[memory_id] = item
+        results = sorted(fused.values(), key=lambda item: (
+            item["hybrid_score"], item.get("importance", 0), item.get("confidence", 0)
+        ), reverse=True)
+        for item in results:
+            item["hybrid_score"] = round(item["hybrid_score"], 6)
+        return results[:max(1, min(limit, 50))]
+
     def search(self, query: str, *, project: str | None = None, limit: int = 8) -> list[dict]:
         query_vector = self.backend.embed(query)
         where = ["m.status='active'", "e.model=?", "e.dimensions=?"]
