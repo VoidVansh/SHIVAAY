@@ -37,6 +37,7 @@
 - [x] Export/import in portable JSON format
 - [ ] Optional encryption at rest
 - [x] HTTP-level Ollama adapter tests against a temporary loopback server (without downloading a model)
+- [x] Database/runtime doctor report and memory provenance inspection CLI
 - [ ] End-to-end tests against a real local model
 - [x] Linux installation and first-run guide
 
