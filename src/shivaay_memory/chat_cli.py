@@ -13,7 +13,8 @@ from .semantic import OllamaEmbeddingBackend, SemanticMemoryIndex
 def main() -> None:
     parser = argparse.ArgumentParser(prog="shivaay-chat", description="Chat with SHIVAAY using local Ollama")
     parser.add_argument("--db", help="SQLite database path (or set SHIVAAY_MEMORY_DB)")
-    parser.add_argument("--project", default="general", help="Memory scope for this chat")\n    parser.add_argument("--conversation-id", help="Resume an existing conversation ID; omit to start a new one")
+    parser.add_argument("--project", default="general", help="Memory scope for this chat")
+    parser.add_argument("--conversation-id", help="Resume an existing conversation ID; omit to start a new one")
     parser.add_argument("--model", default="qwen2.5:3b", help="Chat model already available in local Ollama")
     parser.add_argument("--host", default="http://127.0.0.1:11434", help="Local Ollama host; non-loopback hosts are rejected")
     parser.add_argument("--capture-candidates", action="store_true", help="Queue possible memories for review; never auto-approve")
@@ -35,13 +36,15 @@ def main() -> None:
             print(f"Indexed {count} memory/memories.")
         chat = MemoryChat(engine, backend, project=args.project,
                           extractor=RuleBasedExtractor() if args.capture_candidates else None,
-                          semantic_index=semantic_index, context_chars=args.context_chars, summary_interval=args.summary_every,\n                          conversation_id=args.conversation_id)
+                          semantic_index=semantic_index, context_chars=args.context_chars, summary_interval=args.summary_every,
+                          conversation_id=args.conversation_id)
     except (ValueError, RuntimeError, OSError) as exc:
         print(f"SHIVAAY error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
 
     retrieval = "lexical + semantic" if args.semantic else "lexical"
-    print(f"SHIVAAY local chat · model={args.model} · project={args.project} · retrieval={retrieval}")\n    print(f"Conversation ID: {chat.conversation_id} (reuse with --conversation-id to continue)")
+    print(f"SHIVAAY local chat · model={args.model} · project={args.project} · retrieval={retrieval}")
+    print(f"Conversation ID: {chat.conversation_id} (reuse with --conversation-id to continue)")
     print("Type /quit to exit. Chat turns are archived locally.")
     while True:
         try:
