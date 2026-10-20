@@ -11,7 +11,7 @@ Install Ollama separately, start it, and download a model appropriate for your h
 ## Run the CLI
 
 ```bash
-shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates
+shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --context-chars 8000
 ```
 
 For semantic retrieval as well as full-text retrieval, first pull the embedding model and enable the flag:
@@ -21,7 +21,7 @@ ollama pull nomic-embed-text
 shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --semantic
 ```
 
-When `--semantic` is enabled, SHIVAAY indexes the project's current active memories at startup. First indexing can take a while. Re-run `shivaay-semantic index --project SHIVAAY` after new memories are approved or existing memories are corrected, so the vector index stays current. Semantic hits are added as extra context and labelled with similarity scores; similarity is not proof of truth.
+When `--semantic` is enabled, SHIVAAY indexes the project's current active memories at startup. First indexing can take a while. Re-run `shivaay-semantic index --project SHIVAAY` after new memories are approved or existing memories are corrected, so the vector index stays current. When semantic indexing is enabled, chat fuses lexical and semantic rankings and deduplicates memories by ID. The default context budget is 8,000 characters; adjust it with `--context-chars` (500–50,000). This is a character cap rather than an exact model-token count.
 
 Type `/quit` to exit. Each completed turn is archived locally. `--capture-candidates` queues possible memories for later review; it does not approve them automatically. Review them with `shivaay-memory candidates`, then approve/reject by ID. Omit the flag to disable automatic candidate proposals.
 
@@ -47,6 +47,6 @@ print(answer)
 - SQLite memory, embeddings and archived turns are local by default; this module does not upload them.
 - Chat and embedding adapters only accept loopback Ollama URLs. There is no remote fallback.
 - Ollama must be installed and running locally. Model files take disk space and inference speed depends on CPU/RAM; integrated graphics are not required.
-- Semantic retrieval is optional and requires a separate embedding model. The CLI's `--semantic` option indexes current active memories at startup; re-index after memory changes.
+- Semantic retrieval is optional and requires a separate embedding model. The CLI's `--semantic` option indexes current active memories at startup; the next index pass adds missing vectors and cleans stale ones; use `shivaay-semantic index --rebuild` to recompute all vectors for the selected model.
 - The CLI is functional but is not the polished JARVIS-style desktop HUD yet.
 - Candidate extraction proposes possible memories, but does not save them as durable memories until a person approves them. Avoid putting credentials or other secrets into chat logs.

@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--capture-candidates", action="store_true", help="Queue possible memories for review; never auto-approve")
     parser.add_argument("--semantic", action="store_true", help="Also retrieve memories by meaning using local embeddings")
     parser.add_argument("--embedding-model", default="nomic-embed-text", help="Embedding model available in local Ollama")
+    parser.add_argument("--context-chars", type=int, default=8000, help="Maximum retrieved context characters (500-50000)")
     args = parser.parse_args()
 
     try:
@@ -33,7 +34,7 @@ def main() -> None:
             print(f"Indexed {count} memory/memories.")
         chat = MemoryChat(engine, backend, project=args.project,
                           extractor=RuleBasedExtractor() if args.capture_candidates else None,
-                          semantic_index=semantic_index)
+                          semantic_index=semantic_index, context_chars=args.context_chars)
     except (ValueError, RuntimeError, OSError) as exc:
         print(f"SHIVAAY error: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc

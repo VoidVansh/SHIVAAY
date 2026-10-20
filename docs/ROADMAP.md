@@ -24,7 +24,7 @@
 - [x] Optional local embeddings and semantic retrieval
 - [x] Hybrid lexical + semantic ranking inside chat when semantic indexing is enabled
 - [ ] Conversation window summaries and source-level traceability improvements
-- [ ] Token-budgeted context packing
+- [x] Character-bounded context packing (dependency-free approximation)
 - [x] Efficient incremental re-indexing after memory corrections
 
 ## Milestone 5 — Application integration and reliability
@@ -34,4 +34,4 @@
 - [ ] Optional encryption at rest
 - [ ] End-to-end tests against a real local model and Linux installation guide
 
-The checklist tracks implementation state, not a promise that untested behavior is production-ready. Semantic retrieval remains opt-in; when enabled, chat fuses lexical and semantic rankings and deduplicates memories by ID. Backups use SQLite online backup and require explicit overwrite to replace existing files. Maintenance suggestions and candidate scores are heuristic. Auto-save is disabled by default; when explicitly enabled, it requires configured thresholds and excludes candidates flagged as sensitive. Scans never modify memories.
+The checklist tracks implementation state, not a promise that untested behavior is production-ready. Semantic retrieval remains opt-in; when enabled, chat fuses lexical and semantic rankings and deduplicates memories by ID. Retrieved context has a configurable character budget, not a precise token budget. Backups use SQLite online backup and require explicit overwrite to replace existing files. Maintenance suggestions and candidate scores are heuristic. Auto-save is disabled by default; when explicitly enabled, it requires configured thresholds and excludes candidates flagged as sensitive. Scans never modify memories.

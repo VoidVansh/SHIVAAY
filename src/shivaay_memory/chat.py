@@ -66,7 +66,8 @@ class MemoryChat:
     """Chat orchestration: retrieve context, generate, archive, queue candidates."""
     def __init__(self, engine: MemoryEngine, backend: ChatBackend, *, project: str = "general",
                  extractor: CandidateExtractor | None = None, conversation_id: str | None = None,
-                 history_limit: int = 12, semantic_index: SemanticMemoryIndex | None = None):
+                 history_limit: int = 12, semantic_index: SemanticMemoryIndex | None = None,
+                 context_chars: int = 8000):
         self.engine = engine
         self.backend = backend
         self.project = project
@@ -74,18 +75,19 @@ class MemoryChat:
         self.history_limit = max(2, history_limit)
         self.session = MemorySession(engine, extractor=extractor)
         self.semantic_index = semantic_index
+        self.context_chars = max(500, min(int(context_chars), 50000))
         self.history: list[dict[str, str]] = []
 
     def send(self, user_message: str) -> tuple[str, TurnResult]:
         text = user_message.strip()
         if not text:
             raise ValueError("Message cannot be empty.")
-        memory_context = self.session.context_for(text, project=self.project, limit=8)
+        memory_context = self.session.context_for(text, project=self.project, limit=8, max_chars=self.context_chars)
         if self.semantic_index is not None and hasattr(self.semantic_index, "hybrid_search"):
             # Real local index fuses lexical + semantic ranks, deduplicating by memory ID.
             hybrid_hits = self.semantic_index.hybrid_search(text, project=self.project, limit=8)
             memory_context = self.session.context_for(
-                text, project=self.project, limit=8, memory_override=hybrid_hits
+                text, project=self.project, limit=8, memory_override=hybrid_hits, max_chars=self.context_chars
             )
         elif self.semantic_index is not None:
             # Compatibility path for simple custom adapters that only implement search().

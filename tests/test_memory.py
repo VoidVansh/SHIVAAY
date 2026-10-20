@@ -51,6 +51,13 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertTrue(self.engine.search_conversations("SQLite local database", project="SHIVAAY"))
         self.assertIn("conversation=chat-1", self.engine.build_context("SQLite", project="SHIVAAY"))
 
+    def test_context_respects_character_budget(self):
+        self.engine.add_memory("Important local memory " + ("details " * 200), project="SHIVAAY", importance=5)
+        self.engine.save_summary("project", "SHIVAAY", "Project summary " + ("context " * 500))
+        context = self.engine.build_context("local memory", project="SHIVAAY", max_chars=600)
+        self.assertLessEqual(len(context), 600)
+        self.assertIn("Project summary", context)
+
     def test_summary_upsert(self):
         self.engine.save_summary("project", "SHIVAAY", "First summary")
         self.engine.save_summary("project", "SHIVAAY", "Updated summary")

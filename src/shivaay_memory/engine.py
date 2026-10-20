@@ -242,32 +242,82 @@ class MemoryEngine:
         )
         return rows[0] if rows else None
 
-    def build_context(self, query: str, *, project: str | None = None, limit: int = 8, memory_override: list[dict[str, Any]] | None = None) -> str:
-        """Create a compact, source-labelled context block for a model prompt."""
+    def build_context(
+        self, query: str, *, project: str | None = None, limit: int = 8,
+        memory_override: list[dict[str, Any]] | None = None, max_chars: int = 8000,
+    ) -> str:
+        """Pack relevant context into a bounded, source-labelled character budget.
+
+        This is a dependency-free safety bound, not an exact model-token counter.
+        Higher-priority summaries and ranked memories are considered before older
+        conversation excerpts. Individual entries are clipped only when needed
+        to preserve their source label within the remaining budget.
+        """
+        budget = max(500, min(int(max_chars), 50000))
         chunks: list[str] = []
-        summary = self.get_summary("project", project) if project else None
-        if summary:
-            chunks.append(f"[Project summary: {project}]\n{summary['content']}")
+        used = 0
+
+        def add_group(title: str, entries: list[str]) -> None:
+            nonlocal used
+            if not entries or used >= budget:
+                return
+            heading = f"[{title}]"
+            if used + len(heading) + 1 > budget:
+                return
+            chunks.append(heading)
+            used += len(heading) + 1
+            for entry in entries:
+                if used >= budget:
+                    break
+                remaining = budget - used - 1
+                if remaining <= 0:
+                    break
+                if len(entry) > remaining:
+                    # Preserve the beginning/source metadata; do not split into another entry.
+                    if remaining >= 80:
+                        entry = entry[:remaining - 1].rstrip() + "…"
+                    else:
+                        break
+                chunks.append(entry)
+                used += len(entry) + 1
+                if used >= budget:
+                    break
+
+        project_summary = self.get_summary("project", project) if project else None
         user_summary = self.get_summary("user", "default")
+        if project_summary:
+            content = project_summary["content"].strip()
+            add_group(f"Project summary: {project}", [content[:1600] + ("…" if len(content) > 1600 else "")])
         if user_summary:
-            chunks.append(f"[User summary]\n{user_summary['content']}")
+            content = user_summary["content"].strip()
+            add_group("User summary", [content[:1600] + ("…" if len(content) > 1600 else "")])
+
         memories = memory_override if memory_override is not None else self.retrieve(query, project=project, limit=limit)
-        if memories:
-            chunks.append("[Relevant saved memories]")
-            for m in memories:
-                chunks.append(
-                    f"- (memory #{m['id']}; source={m['source_type']}; "
-                    f"confidence={m['confidence']:.2f}; project={m['project']}) {m['text']}"
-                )
+        memory_entries = []
+        for memory in memories[:max(1, min(limit, 50))]:
+            text = memory["text"].replace("\\n", " ").strip()
+            if len(text) > 1200:
+                text = text[:1197] + "..."
+            score = memory.get("hybrid_score", memory.get("retrieval_score"))
+            score_label = f"; score={score:.3f}" if isinstance(score, (int, float)) else ""
+            memory_entries.append(
+                f"- (memory #{memory['id']}; source={memory['source_type']}; "
+                f"confidence={memory['confidence']:.2f}; project={memory['project']}{score_label}) {text}"
+            )
+        add_group("Relevant saved memories", memory_entries)
+
         conversations = self.search_conversations(query, project=project, limit=min(limit, 5))
-        if conversations:
-            chunks.append("[Relevant conversation excerpts — verify against full conversation if needed]")
-            for c in conversations:
-                excerpt = c["content"].replace("\n", " ")
-                if len(excerpt) > 500:
-                    excerpt = excerpt[:497] + "..."
-                chunks.append(f"- ({c['role']}, conversation={c['conversation_id']}) {excerpt}")
-        return "\n".join(chunks) if chunks else "[No relevant saved context found.]"
+        conversation_entries = []
+        for item in conversations:
+            excerpt = item["content"].replace("\\n", " ").strip()
+            if len(excerpt) > 500:
+                excerpt = excerpt[:497] + "..."
+            conversation_entries.append(
+                f"- ({item['role']}, conversation={item['conversation_id']}) {excerpt}"
+            )
+        add_group("Relevant conversation excerpts — verify against full conversation if needed",
+                  conversation_entries)
+        return "\\n".join(chunks) if chunks else "[No relevant saved context found.]"
 
     def delete_memory(self, memory_id: int) -> bool:
         """Explicit hard deletion; caller should confirm with the user first."""

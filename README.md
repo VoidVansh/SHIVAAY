@@ -37,7 +37,7 @@ The database defaults to `~/.local/share/shivaay/memory.sqlite3`. Set `SHIVAAY_M
 4. Start chatting:
 
 ```bash
-shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates
+shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --context-chars 8000
 ```
 
 Type `/quit` to exit. Each completed turn is archived in the local SQLite database. `--capture-candidates` queues possible memories for later review; it does not approve them automatically. Review them with `shivaay-memory candidates`, then approve/reject by ID. Omit the flag to disable automatic candidate proposals.
@@ -93,4 +93,4 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 python -m unittest discover -s tests -v
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), and [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md), and [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md), [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md), and [docs/CONTEXT_BUDGET.md](docs/CONTEXT_BUDGET.md).
