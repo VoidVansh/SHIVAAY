@@ -44,3 +44,8 @@ Example:
 The interactive `MemoryChat` runtime periodically compacts conversation turns into a `conversation` summary. The default CLI refresh interval is 10 user turns; pass `--summary-every 0` to disable it. The CLI prints a conversation ID; pass `--conversation-id <ID>` on a later launch to restore recent user/assistant history and continue the same summary thread. A summary is included in later prompts as a labelled continuity aid, while the full messages remain in the local archive. Summary generation uses the configured chat backend and therefore adds one extra inference call per interval.
 
 If summary generation fails, the successful user/assistant turn remains archived and the summary window is retained for a later retry. Summaries are fallible model-generated notes, not verified facts; latest explicit user corrections should take precedence.
+
+
+## Recall from older conversations
+
+Prompt packing searches stored conversation summaries for query-term overlap, optionally restricted to the current project. Matching summaries are inserted before individual memories and explicitly labelled as model-generated notes, not verified facts. This dependency-free fallback uses lexical overlap; optional hybrid memory retrieval continues to handle semantic matching for individual memories. The active conversation summary is excluded from prior-summary search and added separately.

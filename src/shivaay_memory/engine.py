@@ -260,9 +260,46 @@ class MemoryEngine:
         )
         return rows[0] if rows else None
 
+    def search_conversation_summaries(
+        self, query: str, *, project: str | None = None, limit: int = 3,
+        exclude_conversation_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Find relevant prior conversation summaries using conservative token overlap."""
+        stopwords = {"the", "and", "for", "that", "this", "with", "from", "what",
+                     "when", "where", "which", "would", "could", "should", "about",
+                     "have", "has", "was", "were", "are", "you", "your", "our",
+                     "into", "then", "than", "how", "why", "did", "does", "use"}
+        query_terms = set(re.findall(r"[\w-]{2,}", query.casefold())) - stopwords
+        if not query_terms:
+            return []
+        where = ["s.scope='conversation'"]
+        params: list[Any] = []
+        if exclude_conversation_id:
+            where.append("s.scope_key <> ?")
+            params.append(exclude_conversation_id)
+        if project:
+            where.append("EXISTS (SELECT 1 FROM conversations c WHERE c.conversation_id=s.scope_key AND c.project=?)")
+            params.append(project)
+        rows = self.store.execute(
+            "SELECT s.scope_key, s.content, s.source_ref, s.updated_at FROM summaries s WHERE "
+            + " AND ".join(where) + " ORDER BY s.updated_at DESC LIMIT 500",
+            tuple(params),
+        )
+        ranked = []
+        for row in rows:
+            terms = set(re.findall(r"[\w-]{2,}", row["content"].casefold())) - stopwords
+            overlap = query_terms & terms
+            if overlap:
+                item = dict(row)
+                item["summary_score"] = round(len(overlap) / max(1, len(query_terms)), 4)
+                ranked.append(item)
+        ranked.sort(key=lambda item: (item["summary_score"], item["updated_at"]), reverse=True)
+        return ranked[:max(1, min(int(limit), 10))]
+
     def build_context(
         self, query: str, *, project: str | None = None, limit: int = 8,
         memory_override: list[dict[str, Any]] | None = None, max_chars: int = 8000,
+        exclude_conversation_id: str | None = None,
     ) -> str:
         """Pack relevant context into a bounded, source-labelled character budget.
 
@@ -314,6 +351,16 @@ class MemoryEngine:
             content = user_summary["content"].strip()
             source_ref = f"; source_ref={user_summary['source_ref']}" if user_summary.get("source_ref") else ""
             add_group(f"User summary{source_ref}", [content[:1600] + ("…" if len(content) > 1600 else "")])
+
+        prior_summaries = self.search_conversation_summaries(
+            query, project=project, limit=3, exclude_conversation_id=exclude_conversation_id
+        )
+        summary_entries = [
+            f"- (conversation={item['scope_key']}; source_ref={item.get('source_ref') or item['scope_key']}; match={item['summary_score']:.2f}) {item['content']}"
+            for item in prior_summaries
+        ]
+        add_group("Related prior conversation summaries — model-generated notes, not verified facts",
+                  summary_entries)
 
         memories = memory_override if memory_override is not None else self.retrieve(query, project=project, limit=limit)
         memory_entries = []

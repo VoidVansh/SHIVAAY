@@ -111,6 +111,21 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertIn("\n", context)
         self.assertNotIn("\\n", context)
 
+    def test_related_prior_conversation_summary_is_retrieved(self):
+        self.engine.archive_conversation("old-chat", [
+            {"role": "user", "content": "We chose SQLite for local memory storage."}
+        ], project="SHIVAAY")
+        self.engine.save_summary("conversation", "old-chat",
+                                 "SHIVAAY uses SQLite for local-first persistent memory storage.",
+                                 source_ref="old-chat")
+        context = self.engine.build_context("How does local persistent memory use SQLite?",
+                                            project="SHIVAAY")
+        self.assertIn("Related prior conversation summaries", context)
+        self.assertIn("old-chat", context)
+        excluded = self.engine.build_context("How does local persistent memory use SQLite?",
+                                             project="SHIVAAY", exclude_conversation_id="old-chat")
+        self.assertNotIn("old-chat", excluded)
+
     def test_context_respects_character_budget(self):
         self.engine.add_memory("Important local memory " + ("details " * 200), project="SHIVAAY", importance=5)
         self.engine.save_summary("project", "SHIVAAY", "Project summary " + ("context " * 500))

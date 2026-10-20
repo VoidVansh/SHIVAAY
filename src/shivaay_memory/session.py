@@ -37,10 +37,12 @@ class MemorySession:
     def context_for(
         self, user_message: str, *, project: str = "general", limit: int = 8,
         memory_override: list[dict] | None = None, max_chars: int = 8000,
+        exclude_conversation_id: str | None = None,
     ) -> str:
         """Return source-labelled memory context to add to the model prompt."""
         return self.engine.build_context(user_message, project=project, limit=limit,
-                                         memory_override=memory_override, max_chars=max_chars)
+                                         memory_override=memory_override, max_chars=max_chars,
+                                         exclude_conversation_id=exclude_conversation_id)
 
     def finish_turn(
         self,

@@ -95,11 +95,12 @@ class MemoryChat:
             hybrid_hits = self.semantic_index.hybrid_search(text, project=self.project, limit=8)
             memory_context = self.session.context_for(
                 text, project=self.project, limit=8, memory_override=hybrid_hits,
-                max_chars=self.context_chars
+                max_chars=self.context_chars, exclude_conversation_id=self.conversation_id
             )
         else:
             memory_context = self.session.context_for(
-                text, project=self.project, limit=8, max_chars=self.context_chars
+                text, project=self.project, limit=8, max_chars=self.context_chars,
+                exclude_conversation_id=self.conversation_id
             )
             if self.semantic_index is not None:
                 # Compatibility path for simple custom adapters that only implement search().
