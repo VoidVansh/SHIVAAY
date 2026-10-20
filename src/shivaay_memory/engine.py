@@ -312,7 +312,8 @@ class MemoryEngine:
                 f"{source_label}; confidence={memory['confidence']:.2f}; importance={memory['importance']}"
                 f"; project={memory['project']}{score_label}) {text}"
             )
-        included_memories = add_group("Relevant saved memories", memory_entries)\n        self.mark_accessed([memory["id"] for memory in memories[:included_memories]])
+        included_memories = add_group("Relevant saved memories", memory_entries)
+        self.mark_accessed([memory["id"] for memory in memories[:included_memories]])
 
         conversations = self.search_conversations(query, project=project, limit=min(limit, 5))
         conversation_entries = []
