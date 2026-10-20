@@ -10,6 +10,8 @@ import sys
 from .engine import MemoryEngine
 from .extraction import CandidateQueue, extract_from_json
 from .maintenance import MemoryMaintenance
+from .backup import backup_database, check_database, restore_database
+from .store import DEFAULT_DB
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -18,6 +20,17 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init", help="Initialize the database and print its location")
+
+    backup = sub.add_parser("backup", help="Create a verified SQLite memory backup")
+    backup.add_argument("--file", required=True, help="Destination backup path")
+    backup.add_argument("--overwrite", action="store_true", help="Replace an existing backup file")
+
+    check = sub.add_parser("check-db", help="Check database integrity and table counts")
+    check.add_argument("--file", help="Check another SQLite database instead of the active database")
+
+    restore = sub.add_parser("restore", help="Restore a verified backup to the active --db path")
+    restore.add_argument("--file", required=True, help="Source backup path")
+    restore.add_argument("--overwrite", action="store_true", help="Replace the active database if it exists")
 
     add = sub.add_parser("add", help="Save one memory")
     add.add_argument("--text", required=True)
@@ -116,11 +129,23 @@ def main() -> None:
             print(f"Error: {exc}", file=sys.stderr)
             raise SystemExit(2) from exc
         return
+    if args.command == "restore":
+        destination = args.db or os.environ.get("SHIVAAY_MEMORY_DB") or str(DEFAULT_DB)
+        try:
+            print(json.dumps(restore_database(args.file, destination, overwrite=args.overwrite), indent=2))
+        except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
+        return
     engine = MemoryEngine(args.db)
     queue = CandidateQueue(engine)
     maintenance = MemoryMaintenance(engine)
     try:
-        if args.command == "init":
+        if args.command == "backup":
+            print(json.dumps(backup_database(engine.store.db_path, args.file, overwrite=args.overwrite), indent=2))
+        elif args.command == "check-db":
+            print(json.dumps(check_database(args.file or engine.store.db_path), indent=2))
+        elif args.command == "init":
             print(f"Initialized: {engine.store.db_path}")
         elif args.command == "add":
             mid = engine.add_memory(

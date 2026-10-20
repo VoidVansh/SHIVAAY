@@ -75,6 +75,8 @@ shivaay-memory maintenance-scan --project SHIVAAY
 shivaay-memory maintenance --status pending
 shivaay-memory check-db
 shivaay-memory backup --file ~/shivaay-backups/memory.sqlite3
+shivaay-memory check-db
+shivaay-memory backup --file ~/shivaay-backups/memory.sqlite3
 ```
 
 To archive an existing conversation from a JSON file, use an array of `{role, content}` objects and run `shivaay-memory archive --conversation-id chat-001 --file conversation.json --project SHIVAAY`. To propose candidates from that file, use `shivaay-memory extract --file conversation.json --project SHIVAAY --source-ref chat-001`.
