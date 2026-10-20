@@ -16,9 +16,9 @@
 - [x] Provider-neutral chat backend interface
 - [x] Local Ollama chat adapter and interactive terminal chat
 - [x] Local Ollama embedding adapter
-- [ ] Candidate scoring for durability, future usefulness, confidence and sensitivity
+- [x] Candidate scoring for durability, future usefulness, confidence and sensitivity
 - [x] Review-first duplicate and possible-conflict suggestions
-- [ ] User-configurable auto-save policy for low-risk, high-confidence memories
+- [x] User-configurable opt-in auto-save policy for high-confidence, low-risk candidates
 
 ## Milestone 4 — Retrieval quality
 - [x] Optional local embeddings and semantic retrieval
@@ -34,4 +34,4 @@
 - [ ] Optional encryption at rest
 - [ ] End-to-end tests against a real local model and Linux installation guide
 
-The checklist tracks implementation state, not a promise that untested behavior is production-ready. Semantic retrieval is currently a separate API/CLI; the default chat continues to use lexical retrieval. Maintenance suggestions are heuristic and require explicit review; scans never modify memories.
+The checklist tracks implementation state, not a promise that untested behavior is production-ready. Semantic retrieval is currently a separate API/CLI; the default chat continues to use lexical retrieval. Maintenance suggestions and candidate scores are heuristic. Auto-save is disabled by default; when explicitly enabled, it requires configured thresholds and excludes candidates flagged as sensitive. Scans never modify memories.

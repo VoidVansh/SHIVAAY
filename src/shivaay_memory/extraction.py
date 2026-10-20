@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .engine import MemoryEngine
+from .scoring import score_candidate
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,16 @@ class CandidateQueue:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_status ON memory_candidates(status, id DESC)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS memory_policy (
+                    id INTEGER PRIMARY KEY CHECK(id=1),
+                    auto_save_enabled INTEGER NOT NULL DEFAULT 0,
+                    min_confidence REAL NOT NULL DEFAULT 0.90,
+                    min_score REAL NOT NULL DEFAULT 0.85,
+                    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+                )
+            """)
+            conn.execute("INSERT OR IGNORE INTO memory_policy(id) VALUES (1)")
 
     def propose(self, candidates: Iterable[MemoryCandidate], *, source_ref: str | None = None) -> list[int]:
         ids: list[int] = []
@@ -127,7 +138,43 @@ class CandidateQueue:
                      source_ref, candidate.confidence, candidate.importance, candidate.reason),
                 )
                 ids.append(int(cur.lastrowid))
+        policy = self.get_policy()
+        if policy["auto_save_enabled"]:
+            for candidate_id in ids:
+                rows = self.engine.store.execute(
+                    "SELECT * FROM memory_candidates WHERE id=? AND status='pending'", (candidate_id,)
+                )
+                if not rows:
+                    continue
+                row = rows[0]
+                metrics = score_candidate(row)
+                if (metrics["sensitivity_risk"] == 0
+                        and row["confidence"] >= policy["min_confidence"]
+                        and metrics["score"] >= policy["min_score"]):
+                    try:
+                        self.approve(candidate_id)
+                    except PermissionError:
+                        # Sensitive-text safeguards are authoritative over auto-save policy.
+                        continue
         return ids
+
+    def get_policy(self) -> dict:
+        rows = self.engine.store.execute("SELECT * FROM memory_policy WHERE id=1")
+        return dict(rows[0]) if rows else {"auto_save_enabled": 0, "min_confidence": 0.90, "min_score": 0.85}
+
+    def set_policy(self, *, auto_save_enabled: bool | None = None,
+                   min_confidence: float | None = None, min_score: float | None = None) -> dict:
+        current = self.get_policy()
+        confidence = current["min_confidence"] if min_confidence is None else min_confidence
+        score = current["min_score"] if min_score is None else min_score
+        if not 0 <= confidence <= 1 or not 0 <= score <= 1:
+            raise ValueError("Policy thresholds must be between 0 and 1.")
+        enabled = current["auto_save_enabled"] if auto_save_enabled is None else int(auto_save_enabled)
+        with self.engine.store.connect() as conn:
+            conn.execute("""UPDATE memory_policy SET auto_save_enabled=?, min_confidence=?, min_score=?,
+                updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=1""",
+                (int(bool(enabled)), confidence, score))
+        return self.get_policy()
 
     def list(self, *, status: str = "pending", limit: int = 50) -> list[dict]:
         if status not in {"pending", "approved", "rejected", "duplicate", "all"}:
@@ -139,7 +186,13 @@ class CandidateQueue:
             params.append(status)
         sql += " ORDER BY id DESC LIMIT ?"
         params.append(max(1, min(limit, 200)))
-        return self.engine.store.execute(sql, tuple(params))
+        rows = self.engine.store.execute(sql, tuple(params))
+        enriched = []
+        for row in rows:
+            item = dict(row)
+            item.update({f"score_{key}": value for key, value in score_candidate(item).items()})
+            enriched.append(item)
+        return enriched
 
     def approve(self, candidate_id: int) -> int:
         with self.engine.store.connect() as conn:

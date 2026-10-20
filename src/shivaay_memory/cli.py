@@ -94,6 +94,11 @@ def _parser() -> argparse.ArgumentParser:
     dismiss_maintenance = sub.add_parser("dismiss-maintenance", help="Dismiss a maintenance suggestion")
     dismiss_maintenance.add_argument("--id", required=True, type=int)
 
+    policy = sub.add_parser("memory-policy", help="Inspect or configure conservative automatic memory saving")
+    policy.add_argument("--auto-save", choices=["on", "off"])
+    policy.add_argument("--min-confidence", type=float)
+    policy.add_argument("--min-score", type=float)
+
     sub.add_parser("stats", help="Show local memory counts")
     delete = sub.add_parser("delete", help="Permanently delete a memory (cannot be undone)")
     delete.add_argument("--id", type=int, required=True)
@@ -158,6 +163,16 @@ def main() -> None:
         elif args.command == "dismiss-maintenance":
             maintenance.dismiss(args.id)
             print("Maintenance suggestion dismissed.")
+        elif args.command == "memory-policy":
+            if args.auto_save is None and args.min_confidence is None and args.min_score is None:
+                print(json.dumps(queue.get_policy(), indent=2))
+            else:
+                updated = queue.set_policy(
+                    auto_save_enabled=None if args.auto_save is None else args.auto_save == "on",
+                    min_confidence=args.min_confidence,
+                    min_score=args.min_score,
+                )
+                print(json.dumps(updated, indent=2))
         elif args.command == "stats":
             stats = {"database": str(engine.store.db_path), **engine.stats()}
             stats["pending_candidates"] = len(queue.list(status="pending", limit=200))

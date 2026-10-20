@@ -70,6 +70,9 @@ shivaay-memory correct --id 1 --text "The corrected fact goes here." --reason "U
 shivaay-memory candidates
 shivaay-memory approve-candidate --id 1
 shivaay-memory reject-candidate --id 2
+shivaay-memory memory-policy
+shivaay-memory maintenance-scan --project SHIVAAY
+shivaay-memory maintenance --status pending
 ```
 
 To archive an existing conversation from a JSON file, use an array of `{role, content}` objects and run `shivaay-memory archive --conversation-id chat-001 --file conversation.json --project SHIVAAY`. To propose candidates from that file, use `shivaay-memory extract --file conversation.json --project SHIVAAY --source-ref chat-001`.
@@ -79,7 +82,7 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 - **Memory is not model training.** It retrieves saved context and supplies it to the model at inference time.
 - Extraction is conservative. User-stated details and model inferences must remain distinguishable; inferences should not be presented as confirmed facts.
 - Sensitive details are gated, but avoid putting credentials or secrets into conversation archives in the first place.
-- Semantic similarity is a relevance signal, not proof that a memory is true. This version does not yet automatically resolve contradictions or consolidate memory history.
+- Semantic similarity and candidate scores are heuristic signals, not proof that a memory is true. Maintenance only proposes possible duplicates/conflicts; it never changes memories during scans. Candidate auto-save is off by default and must be explicitly enabled with thresholds.
 - This is a working foundation, not yet a finished JARVIS-style desktop HUD. Semantic search is implemented as an optional API/CLI and is not yet wired into default chat.
 
 ## Tests
@@ -88,4 +91,4 @@ To archive an existing conversation from a JSON file, use an array of `{role, co
 python -m unittest discover -s tests -v
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), and [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/AUTOMATIC_MEMORY.md](docs/AUTOMATIC_MEMORY.md), [docs/MODEL_EXTRACTION.md](docs/MODEL_EXTRACTION.md), [docs/LOCAL_CHAT.md](docs/LOCAL_CHAT.md), [docs/SEMANTIC_MEMORY.md](docs/SEMANTIC_MEMORY.md), [docs/MEMORY_MAINTENANCE.md](docs/MEMORY_MAINTENANCE.md), and [docs/ADAPTIVE_SCORING.md](docs/ADAPTIVE_SCORING.md).
