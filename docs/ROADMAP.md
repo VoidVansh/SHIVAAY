@@ -26,7 +26,8 @@
 - [x] Optional local embeddings and semantic retrieval
 - [x] Hybrid lexical + semantic ranking inside chat when semantic indexing is enabled
 - [x] Periodic conversation-window summaries, related prior-summary retrieval and conversation resume
-- [x] Character-bounded context packing (dependency-free approximation)\n- [x] Recall-frequency feedback in retrieval ranking
+- [x] Character-bounded context packing (dependency-free approximation)
+- [x] Recall-frequency feedback in retrieval ranking
 - [x] Efficient incremental re-indexing after memory corrections
 
 ## Milestone 5 — Application integration and reliability
