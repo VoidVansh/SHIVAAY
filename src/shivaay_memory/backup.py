@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,7 @@ def check_database(path: str | Path) -> dict[str, Any]:
     db = Path(path).expanduser().resolve()
     if not db.is_file():
         raise FileNotFoundError(f"Database does not exist: {db}")
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn:
         integrity_rows = conn.execute("PRAGMA integrity_check").fetchall()
         integrity = [row[0] for row in integrity_rows]
         tables = {row[0] for row in conn.execute(
@@ -39,9 +40,12 @@ def _copy_database(source: Path, destination: Path, *, overwrite: bool) -> dict[
         raise ValueError(f"Source database failed integrity check: {report['integrity']}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with sqlite3.connect(source) as src, sqlite3.connect(destination) as dst:
+        with closing(sqlite3.connect(source)) as src, closing(sqlite3.connect(destination)) as dst:
             src.backup(dst)
-            dst.execute("PRAGMA integrity_check")
+            dst.commit()
+            integrity = dst.execute("PRAGMA integrity_check").fetchone()[0]
+            if integrity != "ok":
+                raise sqlite3.DatabaseError(f"Destination integrity check failed: {integrity}")
     except sqlite3.DatabaseError as exc:
         raise RuntimeError(f"SQLite backup/restore failed: {exc}") from exc
     final_report = check_database(destination)

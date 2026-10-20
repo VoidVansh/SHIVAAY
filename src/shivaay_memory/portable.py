@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,7 @@ def export_json(database: str | Path, destination: str | Path, *, overwrite: boo
         raise ValueError("Export destination must differ from the database path.")
     if target.exists() and not overwrite:
         raise FileExistsError(f"Export file already exists: {target}; pass overwrite=True to replace it.")
-    with sqlite3.connect(source) as conn:
+    with closing(sqlite3.connect(source)) as conn:
         conn.row_factory = sqlite3.Row
         memories = [dict(row) for row in conn.execute("SELECT * FROM memories ORDER BY id")]
         conversations = [dict(row) for row in conn.execute("SELECT * FROM conversations ORDER BY id")]
@@ -113,7 +114,7 @@ def import_json(database: str | Path, source: str | Path, *, allow_sensitive: bo
         raise FileNotFoundError(f"Target database does not exist; initialize it first: {target}")
 
     memory_id_map: dict[int, int] = {}
-    with sqlite3.connect(target) as conn:
+    with closing(sqlite3.connect(target)) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         # All records are inserted in one transaction; any failure rolls back the import.
         for row in data["memories"]:
@@ -158,6 +159,7 @@ def import_json(database: str | Path, source: str | Path, *, allow_sensitive: bo
                 (row["scope"], row["scope_key"], row["content"], row.get("source_ref"),
                  row.get("created_at"), row.get("updated_at")),
             )
+        conn.commit()
     return {"database": str(target), "memories_imported": len(data["memories"]),
             "conversations_imported": len(data["conversations"]),
             "summaries_imported": len(data["summaries"]), "ok": True}
