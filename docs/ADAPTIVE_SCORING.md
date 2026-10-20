@@ -27,4 +27,4 @@ Disable it at any time:
 shivaay-memory memory-policy --auto-save off
 ```
 
-Rule-based candidates currently have a confidence of 0.72, so the example policy will leave them in the review queue. Auto-save applies only when both configured thresholds are met and the sensitivity heuristic finds no risk. This is not a guarantee that a candidate is correct; keep the review-first default if reliability matters more than convenience.
+Rule-based candidates currently have a confidence of 0.72, so the example policy will leave them in the review queue. Auto-save applies only when both configured thresholds are met, the sensitivity heuristic finds no risk, and no likely negation-based conflict with an active memory is detected in the same project. Likely conflicts stay pending for review rather than silently saving a contradictory claim. Conflict detection is a simple heuristic and may miss subtler contradictions or flag unusual wording. This is not a guarantee that a candidate is correct; keep the review-first default if reliability matters more than convenience.
