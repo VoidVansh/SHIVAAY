@@ -96,6 +96,21 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(rows[0]["score_recurrence_count"], 2)
         self.assertGreaterEqual(rows[0]["score_recurrence"], 0.6)
 
+    def test_repeated_pending_candidate_is_rechecked_by_opt_in_auto_save(self):
+        self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
+        first = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                project="SHIVAAY", confidence=0.89, importance=5)
+        ids = self.queue.propose([first], source_ref="chat-one")
+        self.assertEqual(len(ids), 1)
+        self.assertEqual(self.queue.list(status="pending")[0]["status"], "pending")
+        repeated = MemoryCandidate("I prefer concise explanations.", category="preference",
+                                   project="SHIVAAY", confidence=0.91, importance=5)
+        self.assertEqual(self.queue.propose([repeated], source_ref="chat-two"), [])
+        self.assertEqual(self.engine.stats()["memories"], 1)
+        rows = self.queue.list(status="approved")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["recurrence_count"], 2)
+
     def test_recurrence_improves_score_but_cannot_override_sensitive_gate(self):
         one = {"text": "I prefer concise explanations.", "category": "preference",
                "confidence": 0.8, "importance": 4, "recurrence_count": 1}
