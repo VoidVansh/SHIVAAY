@@ -44,6 +44,42 @@ def possible_conflict_text(a: str, b: str) -> bool:
     return _same_subject(a, b) and negation_differs and _similarity(a, b) >= 0.45
 
 
+_CLAIM_FAMILIES = (
+    re.compile(r"\\b(i\\s+prefer)\\s+(.+)", re.I),
+    re.compile(r"\\b(i\\s+(?:like|love|hate|want|need))\\s+(.+)", re.I),
+    re.compile(r"\\b(i\\s+(?:plan to|intend to|use|study))\\s+(.+)", re.I),
+    re.compile(r"\\b(my\\s+(?:goal|project|plan)\\s+is)\\s+(.+)", re.I),
+    re.compile(r"\\b(i\\s+am\\s+building)\\s+(.+)", re.I),
+)
+_EXPLICIT_UPDATE_CUE = re.compile(
+    r"\\b(?:actually|instead|from now on|no longer|not anymore|rather than|"
+    r"correction|update:|i changed my mind|i now prefer|i now want)\\b",
+    re.I,
+)
+
+
+def possible_update_text(new_text: str, existing_text: str) -> bool:
+    """Detect an explicit, same-claim-family update that needs user review.
+
+    This deliberately requires an update cue in the new statement. It does not
+    assume that two different preferences or goals automatically contradict.
+    """
+    if not _EXPLICIT_UPDATE_CUE.search(new_text):
+        return False
+    def claim(text: str) -> tuple[str, str] | None:
+        for pattern in _CLAIM_FAMILIES:
+            match = pattern.search(text)
+            if match:
+                predicate = re.sub(r"\\s+", " ", match.group(1).casefold()).strip()
+                value = re.split(r"[.!?;\\n]", match.group(2), maxsplit=1)[0]
+                value = " ".join(sorted(_tokens(value)))
+                return predicate, value
+        return None
+    new_claim, old_claim = claim(new_text), claim(existing_text)
+    return bool(new_claim and old_claim and new_claim[0] == old_claim[0]
+                and new_claim[1] and old_claim[1] and new_claim[1] != old_claim[1])
+
+
 class MemoryMaintenance:
     """Find potential maintenance actions and persist them for human review."""
 
