@@ -141,11 +141,16 @@ class MemoryEngine:
                 age_days = 365
             recency = math.exp(-age_days / 180)
             lexical = 1.0 / (1.0 + max(0.0, float(item.get("lexical_rank") or 0)))
+            # A small usage boost lets repeatedly useful memories become easier to recall,
+            # without allowing popularity to overwhelm relevance or explicit confidence.
+            access_count = max(0, int(item.get("access_count") or 0))
+            usage = min(1.0, math.log1p(access_count) / math.log1p(10))
             score = (
-                0.42 * lexical
-                + 0.24 * (item["importance"] / 5)
-                + 0.20 * item["confidence"]
-                + 0.14 * recency
+                0.38 * lexical
+                + 0.22 * (item["importance"] / 5)
+                + 0.18 * item["confidence"]
+                + 0.12 * recency
+                + 0.10 * usage
             )
             item["retrieval_score"] = round(score, 4)
             scored.append(item)

@@ -105,6 +105,14 @@ class MemoryEngineTests(unittest.TestCase):
         self.assertEqual(self.engine.store.execute("SELECT COUNT(*) AS n FROM maintenance_suggestions")[0]["n"], 0)
         self.assertFalse(self.engine.delete_memory(corrected))
 
+    def test_recall_frequency_gently_improves_future_retrieval_score(self):
+        memory_id = self.engine.add_memory("Local memory recall ranking.", project="SHIVAAY")
+        before = self.engine.retrieve("local memory recall")[0]["retrieval_score"]
+        for _ in range(10):
+            self.engine.mark_accessed([memory_id])
+        after = self.engine.retrieve("local memory recall")[0]["retrieval_score"]
+        self.assertGreater(after, before)
+
     def test_context_tracks_only_memories_actually_included(self):
         memory_id = self.engine.add_memory("A relevant memory is visible.", project="SHIVAAY")
         context = self.engine.build_context("relevant memory", project="SHIVAAY")

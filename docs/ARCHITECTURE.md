@@ -5,7 +5,7 @@
 1. **Capture** — the host app passes messages and candidate memories to the library.
 2. **Evaluate** — callers label source type, confidence, importance, project and sensitivity. Candidate extraction can use conservative rules or a provider-neutral structured-model adapter. Extracted candidates remain review-first unless the owner explicitly enables conservative auto-save thresholds.
 3. **Persist** — SQLite stores individual memories, conversation messages and replaceable summaries. FTS5 indexes text.
-4. **Retrieve** — lexical search narrows candidates; ranking blends lexical match, importance, confidence and recency.
+4. **Retrieve** — lexical search narrows candidates; ranking blends lexical match, importance, confidence, recency and a small bounded boost for memories that have repeatedly appeared in useful context.
 5. **Inject** — `build_context()` returns a source-labelled text block for the model prompt.
 6. **Correct** — corrections create a new record and mark the old record superseded, preserving provenance.
 7. **Review** — list/search/delete APIs and CLI allow the owner to inspect and control saved data. Hard deletion cleans dependent suggestions and semantic vectors; conversation archives have a separate delete command, with linked-memory deletion requiring an explicit flag.
