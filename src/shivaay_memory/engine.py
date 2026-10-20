@@ -380,7 +380,10 @@ class MemoryEngine:
         included_memories = add_group("Relevant saved memories", memory_entries)
         self.mark_accessed([memory["id"] for memory in memories[:included_memories]])
 
-        conversations = self.search_conversations(query, project=project, limit=min(limit, 5))
+        conversations = [
+            item for item in self.search_conversations(query, project=project, limit=min(limit, 5))
+            if not exclude_conversation_id or item["conversation_id"] != exclude_conversation_id
+        ]
         conversation_entries = []
         for item in conversations:
             excerpt = item["content"].replace("\\n", " ").strip()
