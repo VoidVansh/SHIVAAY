@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +14,13 @@ class MemoryEngineTests(unittest.TestCase):
 
     def tearDown(self):
         self.tempdir.cleanup()
+
+    def test_store_connection_closes_after_context_exit(self):
+        connection = self.engine.store.connect()
+        with connection as conn:
+            conn.execute("SELECT 1")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            connection.execute("SELECT 1")
 
     def test_add_search_and_project_isolation(self):
         mid = self.engine.add_memory(
