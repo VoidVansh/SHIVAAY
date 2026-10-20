@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .engine import MemoryEngine
+from .maintenance import possible_conflict_text
 from .scoring import score_candidate
 
 
@@ -148,14 +149,21 @@ class CandidateQueue:
                     continue
                 row = rows[0]
                 metrics = score_candidate(row)
-                if (metrics["sensitivity_risk"] == 0
-                        and row["confidence"] >= policy["min_confidence"]
-                        and metrics["score"] >= policy["min_score"]):
-                    try:
-                        self.approve(candidate_id)
-                    except PermissionError:
-                        # Sensitive-text safeguards are authoritative over auto-save policy.
-                        continue
+                if (metrics["sensitivity_risk"] != 0
+                        or row["confidence"] < policy["min_confidence"]
+                        or metrics["score"] < policy["min_score"]):
+                    continue
+                # Never silently auto-save a likely contradiction of an active memory.
+                # The candidate stays pending so the user can decide which claim is current.
+                active_memories = self.engine.list_memories(project=row["project"], limit=500)
+                if any(possible_conflict_text(row["text"], memory["text"])
+                       for memory in active_memories):
+                    continue
+                try:
+                    self.approve(candidate_id)
+                except PermissionError:
+                    # Sensitive-text safeguards are authoritative over auto-save policy.
+                    continue
         return ids
 
     def get_policy(self) -> dict:
