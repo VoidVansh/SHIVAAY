@@ -196,9 +196,36 @@ class CandidateQueue:
         params.append(max(1, min(limit, 200)))
         rows = self.engine.store.execute(sql, tuple(params))
         enriched = []
+        policy = self.get_policy()
+        active_by_project: dict[str, list[dict]] = {}
         for row in rows:
             item = dict(row)
-            item.update({f"score_{key}": value for key, value in score_candidate(item).items()})
+            metrics = score_candidate(item)
+            item.update({f"score_{key}": value for key, value in metrics.items()})
+            if item["status"] != "pending":
+                decision, reason = item["status"], "Candidate has already been reviewed."
+            elif not policy["auto_save_enabled"]:
+                decision, reason = "review", "Automatic saving is disabled."
+            elif metrics["sensitivity_risk"] != 0:
+                decision, reason = "blocked", "Sensitivity heuristic flagged this candidate."
+            elif item["confidence"] < policy["min_confidence"]:
+                decision, reason = "review", "Confidence is below the configured auto-save threshold."
+            elif metrics["score"] < policy["min_score"]:
+                decision, reason = "review", "Score is below the configured auto-save threshold."
+            else:
+                project = item["project"]
+                if project not in active_by_project:
+                    active_by_project[project] = self.engine.list_memories(project=project, limit=500)
+                conflict = any(possible_conflict_text(item["text"], memory["text"])
+                               for memory in active_by_project[project])
+                if conflict:
+                    decision, reason = "blocked", "Possible contradiction with an active memory; review manually."
+                else:
+                    decision, reason = "eligible", (
+                        "Meets current thresholds; queued items are not auto-approved retroactively."
+                    )
+            item["auto_save_decision"] = decision
+            item["auto_save_reason"] = reason
             enriched.append(item)
         return enriched
 
