@@ -18,6 +18,7 @@ from .extraction import CandidateExtractor, CandidateQueue
 class TurnResult:
     archived_messages: int
     candidate_ids: tuple[int, ...]
+    candidate_error: str | None = None
 
 
 class MemorySession:
@@ -61,11 +62,15 @@ class MemorySession:
             conversation_id, messages, project=project
         )
         candidate_ids: list[int] = []
+        candidate_error: str | None = None
         if self.extractor is not None and user_message.strip():
-            candidates = self.extractor.extract(
-                [{"role": "user", "content": user_message}], project=project
-            )
-            candidate_ids = self.queue.propose(
-                candidates, source_ref=conversation_id
-            )
-        return TurnResult(archived_messages=archived, candidate_ids=tuple(candidate_ids))
+            try:
+                candidates = self.extractor.extract(
+                    [{"role": "user", "content": user_message}], project=project
+                )
+                candidate_ids = self.queue.propose(candidates, source_ref=conversation_id)
+            except Exception as exc:
+                # Preserve the successful answer/archive even if local extraction fails.
+                candidate_error = f"{type(exc).__name__}: {exc}"
+        return TurnResult(archived_messages=archived, candidate_ids=tuple(candidate_ids),
+                          candidate_error=candidate_error)

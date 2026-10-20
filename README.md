@@ -40,7 +40,7 @@ The database defaults to `~/.local/share/shivaay/memory.sqlite3`. Set `SHIVAAY_M
 shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --context-chars 8000
 ```
 
-Type `/quit` to exit. Each completed turn is archived in the local SQLite database. `--capture-candidates` queues possible memories for later review; it does not approve them automatically. Review them with `shivaay-memory candidates`, then approve/reject by ID. Omit the flag to disable automatic candidate proposals.
+Type `/quit` to exit. Each completed turn is archived in the local SQLite database. `--capture-candidates` queues possible memories for later review; it does not approve them automatically. By default it uses fast rules; add `--capture-mode model` for richer extraction using the local Ollama model (one extra model call per turn). Review them with `shivaay-memory candidates`, then approve/reject by ID. Omit the flag to disable candidate proposals.
 
 The chat backend defaults to `http://127.0.0.1:11434` and rejects non-loopback hosts. If Ollama is not running or the model is unavailable, SHIVAAY reports an error and does not fall back to a cloud service. Model weights consume disk space and inference performance depends on CPU/RAM; a small quantized model is a sensible starting point on a 4–8 GB RAM machine.
 

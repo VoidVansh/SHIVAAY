@@ -11,7 +11,7 @@ Install Ollama separately, start it, and download a model appropriate for your h
 ## Run the CLI
 
 ```bash
-shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --context-chars 8000
+shivaay-chat --project SHIVAAY --model qwen2.5:3b --capture-candidates --capture-mode model --context-chars 8000
 ```
 
 For semantic retrieval as well as full-text retrieval, first pull the embedding model and enable the flag:

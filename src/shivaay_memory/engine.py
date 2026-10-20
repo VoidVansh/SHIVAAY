@@ -386,7 +386,7 @@ class MemoryEngine:
         ]
         conversation_entries = []
         for item in conversations:
-            excerpt = item["content"].replace("\\n", " ").strip()
+            excerpt = item["content"].replace("\n", " ").strip()
             if len(excerpt) > 500:
                 excerpt = excerpt[:497] + "..."
             conversation_entries.append(

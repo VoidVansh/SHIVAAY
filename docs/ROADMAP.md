@@ -8,7 +8,7 @@
 
 ## Milestone 2 — Candidate extraction and review
 - [x] Conservative rule-based candidate extractor from user messages
-- [x] Provider-neutral structured model extractor
+- [x] Provider-neutral structured model extractor and optional local-chat integration
 - [x] Candidate queue, duplicate proposal suppression, approve/reject controls
 - [x] CLI commands and CI workflow
 
