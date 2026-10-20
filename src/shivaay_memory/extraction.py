@@ -125,6 +125,9 @@ class CandidateQueue:
 
     def propose(self, candidates: Iterable[MemoryCandidate], *, source_ref: str | None = None) -> list[int]:
         ids: list[int] = []
+        # Track pending rows for policy evaluation separately from the return value:
+        # repeated candidates update existing rows but are not newly queued IDs.
+        auto_save_ids: list[int] = []
         with self.engine.store.connect() as conn:
             for candidate in candidates:
                 normalized = re.sub(r"\W+", " ", candidate.text.casefold()).strip()
@@ -134,7 +137,7 @@ class CandidateQueue:
                 # and case differences don't create duplicate queue rows. Keep this
                 # scoped to the same project and actionable/reviewed candidates.
                 existing_rows = conn.execute(
-                    """SELECT id, text FROM memory_candidates
+                    """SELECT id, text, status FROM memory_candidates
                        WHERE project=? AND status IN ('pending','approved')
                        ORDER BY id""",
                     (candidate.project,),
@@ -156,6 +159,8 @@ class CandidateQueue:
                            WHERE id=?""",
                         (candidate.confidence, candidate.importance, exists["id"]),
                     )
+                    if exists["status"] == "pending":
+                        auto_save_ids.append(int(exists["id"]))
                     continue
                 cur = conn.execute(
                     """INSERT INTO memory_candidates
@@ -165,9 +170,10 @@ class CandidateQueue:
                      source_ref, candidate.confidence, candidate.importance, candidate.reason),
                 )
                 ids.append(int(cur.lastrowid))
+                auto_save_ids.append(int(cur.lastrowid))
         policy = self.get_policy()
         if policy["auto_save_enabled"]:
-            for candidate_id in ids:
+            for candidate_id in dict.fromkeys(auto_save_ids):
                 rows = self.engine.store.execute(
                     "SELECT * FROM memory_candidates WHERE id=? AND status='pending'", (candidate_id,)
                 )
