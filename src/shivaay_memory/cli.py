@@ -242,6 +242,12 @@ def main() -> None:
                 "database": str(engine.store.db_path),
                 "integrity": integrity,
                 "memory_stats": engine.stats(),
+                "pending_candidates": int(engine.store.execute(
+                    "SELECT COUNT(*) AS n FROM memory_candidates WHERE status='pending'"
+                )[0]["n"]),
+                "pending_maintenance_suggestions": int(engine.store.execute(
+                    "SELECT COUNT(*) AS n FROM maintenance_suggestions WHERE status='pending'"
+                )[0]["n"]),
                 "candidate_policy": queue.get_policy(),
                 "notes": [
                     "Memory CLI uses the selected local SQLite database.",
