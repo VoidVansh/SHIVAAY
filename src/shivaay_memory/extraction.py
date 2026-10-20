@@ -104,6 +104,13 @@ class CandidateQueue:
                     reviewed_at TEXT
                 )
             """)
+            # Safe additive migration for databases created by older SHIVAAY versions.
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(memory_candidates)").fetchall()}
+            if "recurrence_count" not in columns:
+                conn.execute("ALTER TABLE memory_candidates ADD COLUMN recurrence_count INTEGER NOT NULL DEFAULT 1")
+            if "last_seen_at" not in columns:
+                conn.execute("ALTER TABLE memory_candidates ADD COLUMN last_seen_at TEXT")
+            conn.execute("UPDATE memory_candidates SET last_seen_at=created_at WHERE last_seen_at IS NULL")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_status ON memory_candidates(status, id DESC)")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS memory_policy (
@@ -130,6 +137,17 @@ class CandidateQueue:
                     (candidate.project, candidate.text),
                 ).fetchone()
                 if exists:
+                    # Repeated exact mentions are useful evidence of durability.
+                    # Keep the same review item; never create duplicate memories.
+                    conn.execute(
+                        """UPDATE memory_candidates
+                           SET recurrence_count=recurrence_count+1,
+                               last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                               confidence=MAX(confidence, ?),
+                               importance=MAX(importance, ?)
+                           WHERE id=?""",
+                        (candidate.confidence, candidate.importance, exists["id"]),
+                    )
                     continue
                 cur = conn.execute(
                     """INSERT INTO memory_candidates
