@@ -17,6 +17,12 @@ class FakeBackend:
         return self.answer
 
 
+class FakeSemanticIndex:
+    def search(self, query, *, project=None, limit=8):
+        return [{"id": 42, "semantic_score": 0.91, "source_type": "user_statement",
+                 "confidence": 1.0, "text": "The user wants meaning-based memory retrieval."}]
+
+
 class ChatTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -34,6 +40,13 @@ class ChatTests(unittest.TestCase):
         self.assertIn("local-first", backend.calls[0][0]["content"])
         self.assertEqual(result.archived_messages, 2)
         self.assertEqual(len(chat.history), 2)
+
+    def test_semantic_hits_are_added_to_prompt(self):
+        backend = FakeBackend()
+        chat = MemoryChat(self.engine, backend, semantic_index=FakeSemanticIndex())
+        chat.send("How should memory recall work?")
+        self.assertIn("meaning-based memory retrieval", backend.calls[0][0]["content"])
+        self.assertIn("similarity=0.910", backend.calls[0][0]["content"])
 
     def test_rule_extractor_only_queues_candidates(self):
         backend = FakeBackend()
