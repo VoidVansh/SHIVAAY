@@ -48,6 +48,8 @@ class CliTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["integrity"]["integrity"], ["ok"])
         self.assertEqual(payload["candidate_policy"]["auto_save_enabled"], 0)
+        self.assertEqual(payload["pending_candidates"], 0)
+        self.assertEqual(payload["pending_maintenance_suggestions"], 0)
 
 
 if __name__ == "__main__":
