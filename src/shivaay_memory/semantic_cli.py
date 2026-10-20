@@ -18,6 +18,7 @@ def main() -> None:
     index = sub.add_parser("index", help="Embed all active memories into the local vector index")
     index.add_argument("--project")
     index.add_argument("--limit", type=int, default=10000)
+    index.add_argument("--rebuild", action="store_true", help="Recompute vectors even when current-model vectors already exist")
     search = sub.add_parser("search", help="Find semantically similar saved memories")
     search.add_argument("query")
     search.add_argument("--project")
@@ -29,8 +30,8 @@ def main() -> None:
         backend = OllamaEmbeddingBackend(model=args.model, host=args.host)
         indexer = SemanticMemoryIndex(engine, backend)
         if args.command == "index":
-            count = indexer.index_all(project=args.project, limit=args.limit)
-            print(f"Indexed {count} active memory/memories using {args.model}.")
+            count = indexer.index_all(project=args.project, limit=args.limit, force=args.rebuild)
+            print(f"Created/refreshed {count} vector(s) using {args.model}; existing current-model vectors were reused unless --rebuild was set.")
         elif args.command == "search":
             print(json.dumps(indexer.search(args.query, project=args.project, limit=args.limit), indent=2, ensure_ascii=False))
         elif args.command == "clean":

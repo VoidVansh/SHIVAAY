@@ -8,12 +8,15 @@ from shivaay_memory.semantic import SemanticMemoryIndex, cosine_similarity, Olla
 
 class FakeEmbeddings:
     model = "test-embeddings"
+    def __init__(self):
+        self.calls = []
     vectors = {
         "My computer should work offline": [1.0, 0.0],
         "I want the app to work without internet": [0.95, 0.05],
         "Chocolate cake recipe": [0.0, 1.0],
     }
     def embed(self, text):
+        self.calls.append(text)
         return self.vectors.get(text, [0.9, 0.1])
 
 
@@ -39,6 +42,13 @@ class SemanticTests(unittest.TestCase):
         results = self.index.search("I want the app to work without internet", project="SHIVAAY")
         self.assertEqual([row["id"] for row in results], [first])
         self.assertGreater(results[0]["semantic_score"], 0.9)
+
+    def test_index_all_reuses_current_model_vectors_and_can_rebuild(self):
+        self.engine.add_memory("My computer should work offline", project="SHIVAAY")
+        self.assertEqual(self.index.index_all(project="SHIVAAY"), 1)
+        self.assertEqual(self.index.index_all(project="SHIVAAY"), 0)
+        self.assertEqual(self.index.index_all(project="SHIVAAY", force=True), 1)
+        self.assertEqual(len(self.backend.calls), 2)
 
     def test_hybrid_search_fuses_lexical_and_semantic_results(self):
         first = self.engine.add_memory("My computer should work offline", project="SHIVAAY", importance=5)

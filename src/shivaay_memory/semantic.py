@@ -105,11 +105,26 @@ class SemanticMemoryIndex:
                 vector_json=excluded.vector_json, updated_at=excluded.updated_at""",
                 (memory_id, self.backend.model, len(vector), json.dumps(vector), stamp))
 
-    def index_all(self, *, project: str | None = None, limit: int = 10000) -> int:
+    def index_all(self, *, project: str | None = None, limit: int = 10000,
+                  force: bool = False) -> int:
+        """Index missing active memories; use force=True to rebuild selected vectors.
+
+        Existing vectors for the same embedding model are reused by default,
+        making chat startup incremental. Returns the number of vectors created
+        or refreshed, not the total number of active memories.
+        """
         memories = self.engine.list_memories(project=project, limit=max(1, min(limit, 10000)))
+        indexed = 0
         for memory in memories:
+            existing = self.engine.store.execute(
+                "SELECT model FROM memory_embeddings WHERE memory_id=?", (memory["id"],)
+            )
+            if not force and existing and existing[0]["model"] == self.backend.model:
+                continue
             self.index_memory(memory["id"])
-        return len(memories)
+            indexed += 1
+        self.remove_stale_entries()
+        return indexed
 
     def hybrid_search(self, query: str, *, project: str | None = None, limit: int = 8,
                       lexical_weight: float = 0.55, semantic_weight: float = 0.45) -> list[dict]:

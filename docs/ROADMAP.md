@@ -25,7 +25,7 @@
 - [x] Hybrid lexical + semantic ranking inside chat when semantic indexing is enabled
 - [ ] Conversation window summaries and source-level traceability improvements
 - [ ] Token-budgeted context packing
-- [ ] Efficient incremental re-indexing after memory corrections
+- [x] Efficient incremental re-indexing after memory corrections
 
 ## Milestone 5 — Application integration and reliability
 - [x] Provider-neutral session integration and local chat CLI
