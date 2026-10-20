@@ -37,6 +37,9 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(self.queue.list(status="pending")[0]["id"], ids[0])
         self.assertEqual(self.engine.stats()["memories"], 0)
         self.assertEqual(self.queue.get_policy()["auto_save_enabled"], 0)
+        pending = self.queue.list(status="pending")[0]
+        self.assertEqual(pending["auto_save_decision"], "review")
+        self.assertIn("disabled", pending["auto_save_reason"])
 
     def test_auto_save_keeps_sensitive_candidates_pending(self):
         self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
@@ -48,6 +51,9 @@ class ScoringTests(unittest.TestCase):
         rows = {row["id"]: row for row in self.queue.list(status="all")}
         self.assertEqual(rows[ids[0]]["status"], "pending")
         self.assertEqual(self.engine.stats()["memories"], 0)
+        pending = self.queue.list(status="pending")[0]
+        self.assertEqual(pending["auto_save_decision"], "blocked")
+        self.assertIn("Sensitivity", pending["auto_save_reason"])
 
     def test_auto_save_keeps_possible_conflicts_pending_for_review(self):
         self.engine.add_memory("I prefer concise explanations.", category="preference",
@@ -61,6 +67,9 @@ class ScoringTests(unittest.TestCase):
         rows = {row["id"]: row for row in self.queue.list(status="all")}
         self.assertEqual(rows[ids[0]]["status"], "pending")
         self.assertEqual(self.engine.stats()["memories"], 1)
+        pending = self.queue.list(status="pending")[0]
+        self.assertEqual(pending["auto_save_decision"], "blocked")
+        self.assertIn("contradiction", pending["auto_save_reason"])
 
     def test_opt_in_auto_save_saves_only_high_confidence_candidate(self):
         self.queue.set_policy(auto_save_enabled=True, min_confidence=0.9, min_score=0.85)
