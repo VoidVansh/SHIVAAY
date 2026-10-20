@@ -77,13 +77,23 @@ class MemoryChat:
         self.semantic_index = semantic_index
         self.context_chars = max(500, min(int(context_chars), 50000))
         self.summary_interval = max(0, min(int(summary_interval), 1000))
-        self._turn_count = 0
         self._summary_window: list[dict[str, str]] = []
         self.last_summary_error: str | None = None
         self.history: list[dict[str, str]] = [
             {"role": row["role"], "content": row["content"]}
             for row in engine.get_conversation_messages(self.conversation_id, limit=self.history_limit)
             if row["role"] in {"user", "assistant"}
+        ]
+        # Rebuild the pending summary window after restart from archived messages
+        # newer than the last summary; do not silently drop turns between intervals.
+        previous_summary = engine.get_summary("conversation", self.conversation_id)
+        summary_updated_at = previous_summary.get("updated_at", "") if previous_summary else ""
+        archived = engine.get_conversation_messages(self.conversation_id, limit=500)
+        self._summary_window = [
+            {"role": row["role"], "content": row["content"]}
+            for row in archived
+            if row["role"] in {"user", "assistant"}
+            and (not summary_updated_at or row.get("created_at", "") > summary_updated_at)
         ]
 
     def send(self, user_message: str) -> tuple[str, TurnResult]:
@@ -135,8 +145,7 @@ class MemoryChat:
         self.history = self.history[-self.history_limit:]
         if self.summary_interval:
             self._summary_window.extend(turn_messages)
-            self._turn_count += 1
-            if self._turn_count % self.summary_interval == 0:
+            if len(self._summary_window) >= self.summary_interval * 2:
                 self._refresh_conversation_summary()
         return answer, result
 

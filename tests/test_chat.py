@@ -80,6 +80,38 @@ class ChatTests(unittest.TestCase):
         self.assertIn("Current conversation summary", backend.calls[-1][0]["content"])
         self.assertIn("next step is improve memory", backend.calls[-1][0]["content"])
 
+    def test_resumed_chat_summarizes_archived_turns_after_last_summary(self):
+        self.engine.save_summary("conversation", "resume-summary", "Older summary.",
+                                 source_ref="resume-summary")
+        self.engine.store.execute(
+            "UPDATE summaries SET updated_at='2000-01-01T00:00:00.000Z' WHERE scope='conversation' AND scope_key=?",
+            ("resume-summary",),
+        )
+        self.engine.archive_conversation("resume-summary", [
+            {"role": "user", "content": "We decided the interface should be centered."},
+            {"role": "assistant", "content": "I will keep the interface centered."},
+        ], project="SHIVAAY")
+
+        class SummaryBackend:
+            def __init__(self):
+                self.calls = []
+            def reply(self, messages):
+                self.calls.append(messages)
+                if "Summarize conversation data faithfully" in messages[0]["content"]:
+                    return "Summary includes the centered interface decision."
+                return "Continuing the project."
+
+        backend = SummaryBackend()
+        chat = MemoryChat(self.engine, backend, project="SHIVAAY",
+                          conversation_id="resume-summary", summary_interval=2)
+        self.assertEqual(len(chat._summary_window), 2)
+        chat.send("Continue from that decision.")
+        saved = self.engine.get_summary("conversation", "resume-summary")
+        self.assertIn("centered interface decision", saved["content"])
+        summary_call = next(call for call in backend.calls
+                            if "Summarize conversation data faithfully" in call[0]["content"])
+        self.assertIn("We decided the interface should be centered", summary_call[1]["content"])
+
     def test_summary_failure_does_not_fail_successful_chat_turn(self):
         class FlakyBackend:
             def __init__(self):
