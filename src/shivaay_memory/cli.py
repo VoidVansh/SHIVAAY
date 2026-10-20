@@ -7,6 +7,7 @@ import json
 import sys
 
 from .engine import MemoryEngine
+from .extraction import CandidateQueue, extract_from_json
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -50,6 +51,21 @@ def _parser() -> argparse.ArgumentParser:
     archive.add_argument("--file", required=True, help="JSON array of {role, content} messages")
     archive.add_argument("--project", default="general")
 
+    extract = sub.add_parser("extract", help="Propose memory candidates from user messages in a JSON file")
+    extract.add_argument("--file", required=True, help="JSON array of {role, content} messages")
+    extract.add_argument("--project", default="general")
+    extract.add_argument("--source-ref", help="Conversation ID or source reference")
+
+    candidates = sub.add_parser("candidates", help="Review queued memory candidates")
+    candidates.add_argument("--status", choices=["pending", "approved", "rejected", "duplicate", "all"], default="pending")
+    candidates.add_argument("--limit", type=int, default=50)
+
+    approve = sub.add_parser("approve-candidate", help="Approve a candidate and save it as a memory")
+    approve.add_argument("--id", required=True, type=int)
+
+    reject = sub.add_parser("reject-candidate", help="Reject a pending candidate")
+    reject.add_argument("--id", required=True, type=int)
+
     summary = sub.add_parser("summary", help="Save or replace a scope summary")
     summary.add_argument("--scope", choices=["user", "project", "conversation"], required=True)
     summary.add_argument("--key", required=True)
@@ -70,6 +86,7 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _parser().parse_args()
     engine = MemoryEngine(args.db)
+    queue = CandidateQueue(engine)
     try:
         if args.command == "init":
             print(f"Initialized: {engine.store.db_path}")
@@ -94,13 +111,27 @@ def main() -> None:
             if not isinstance(messages, list):
                 raise ValueError("Conversation JSON must be an array.")
             print(f"Archived {engine.archive_conversation(args.conversation_id, messages, project=args.project)} messages.")
+        elif args.command == "extract":
+            ids = extract_from_json(engine, args.file, project=args.project, source_ref=args.source_ref)
+            print(f"Queued {len(ids)} memory candidate(s) for review.")
+            if ids:
+                print("Candidate IDs: " + ", ".join(map(str, ids)))
+        elif args.command == "candidates":
+            print(json.dumps(queue.list(status=args.status, limit=args.limit), indent=2, ensure_ascii=False))
+        elif args.command == "approve-candidate":
+            print(f"Approved candidate; saved memory #{queue.approve(args.id)}")
+        elif args.command == "reject-candidate":
+            queue.reject(args.id)
+            print("Candidate rejected.")
         elif args.command == "summary":
             engine.save_summary(args.scope, args.key, args.text, source_ref=args.source_ref)
             print("Summary saved.")
         elif args.command == "context":
             print(engine.build_context(args.query, project=args.project, limit=args.limit))
         elif args.command == "stats":
-            print(json.dumps({"database": str(engine.store.db_path), **engine.stats()}, indent=2))
+            stats = {"database": str(engine.store.db_path), **engine.stats()}
+            stats["pending_candidates"] = len(queue.list(status="pending", limit=200))
+            print(json.dumps(stats, indent=2))
         elif args.command == "delete":
             print("Deleted." if engine.delete_memory(args.id) else "Memory not found.")
     except (ValueError, PermissionError, KeyError, RuntimeError, OSError, json.JSONDecodeError) as exc:
