@@ -1,0 +1,8 @@
+# Install in a fresh GPU notebook. Use a current compatible CUDA/PyTorch runtime.
+torch
+transformers>=4.51.0
+datasets>=3.0.0
+trl>=0.19.0
+peft>=0.15.0
+accelerate>=1.0.0
+bitsandbytes>=0.45.0
